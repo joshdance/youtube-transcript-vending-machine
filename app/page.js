@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
+import JobStatus from "./components/JobStatus";
+import ErrorMessage from "./components/ErrorMessage";
+import DownloadButton from "./components/DownloadButton";
+import TranscriptDisplay from "./components/TranscriptDisplay";
+
+// Toggle for development logging
+const DEV_MODE = false;
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -9,15 +15,35 @@ export default function Home() {
   const [jobId, setJobId] = useState(null);
   const [transcript, setTranscript] = useState(null);
   const [transcriptUrl, setTranscriptUrl] = useState(null);
+  const [transcriptType, setTranscriptType] = useState(null);
   const [error, setError] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
 
-  // Clean up polling on unmount
+  // Debug logging function to control output
+  const debugLog = (...args) => {
+    if (DEV_MODE) {
+      console.log(...args);
+    }
+  };
+
+  // Clean up polling on unmount or when job completes
   useEffect(() => {
     return () => {
-      if (pollingInterval) clearInterval(pollingInterval);
+      if (pollingInterval) {
+        debugLog("Cleaning up polling interval on unmount");
+        clearInterval(pollingInterval);
+      }
     };
   }, [pollingInterval]);
+
+  // Additional effect to stop polling when transcript is received
+  useEffect(() => {
+    if (transcript && pollingInterval) {
+      debugLog("Transcript received, clearing polling interval");
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+    }
+  }, [transcript, pollingInterval]);
 
   // Function to download the raw transcript
   const downloadRawTranscript = async () => {
@@ -54,6 +80,8 @@ export default function Home() {
 
   // Function to check job status
   const checkJobStatus = async (id) => {
+    if (!id) return;
+    
     try {
       const response = await fetch(`/api/job-status?id=${id}`);
       const data = await response.json();
@@ -62,12 +90,13 @@ export default function Home() {
         throw new Error(data.error || "Failed to check job status");
       }
       
-      console.log("Job status check:", data.status);
+      debugLog("Job status check:", data.status);
       
       // If job is complete, get the results
       if (data.status === "completed" || data.status === "success" || data.status === "finished") {
         // Clear polling interval
         if (pollingInterval) {
+          debugLog("Job complete, clearing interval");
           clearInterval(pollingInterval);
           setPollingInterval(null);
         }
@@ -81,10 +110,13 @@ export default function Home() {
             
             // Fetch the VTT content
             try {
+              debugLog("Fetching VTT content");
               const vttResponse = await fetch('/api/fetch-vtt?url=' + encodeURIComponent(outputData.en.url));
               const vttData = await vttResponse.json();
               if (vttResponse.ok && vttData.content) {
                 setTranscript(vttData.content);
+                // Set the transcript type
+                setTranscriptType(vttData.transcriptType || 'simple');
               } else {
                 setTranscript({
                   message: "Transcript URL available but content couldn't be parsed",
@@ -93,6 +125,7 @@ export default function Home() {
                 });
               }
             } catch (vttError) {
+              console.error("VTT fetch error:", vttError);
               setTranscript({
                 message: "Transcript URL available but couldn't be fetched",
                 transcriptUrl: outputData.en.url,
@@ -122,6 +155,7 @@ export default function Home() {
         
         // Clear polling interval
         if (pollingInterval) {
+          debugLog("Job failed, clearing interval");
           clearInterval(pollingInterval);
           setPollingInterval(null);
         }
@@ -134,6 +168,7 @@ export default function Home() {
       
       // Clear polling interval
       if (pollingInterval) {
+        debugLog("Error in job status check, clearing interval");
         clearInterval(pollingInterval);
         setPollingInterval(null);
       }
@@ -150,14 +185,17 @@ export default function Home() {
     setError(null);
     setTranscript(null);
     setTranscriptUrl(null);
+    setTranscriptType(null);
     
     // Clear any existing polling
     if (pollingInterval) {
+      debugLog("Starting new request, clearing existing interval");
       clearInterval(pollingInterval);
       setPollingInterval(null);
     }
 
     try {
+      debugLog("Fetching transcript for URL:", url);
       const response = await fetch("/api/transcripts", {
         method: "POST",
         headers: {
@@ -172,13 +210,13 @@ export default function Home() {
         throw new Error(data.error || "Failed to fetch transcript");
       }
 
-      console.log("Initial API response:", data);
-
+      debugLog("Initial API response received");
+      
       // The job ID might be in different places depending on the API response
       const jobId = data.id || (data.job && data.job.id);
       
       if (jobId) {
-        console.log("Got job ID:", jobId);
+        debugLog("Got job ID:", jobId);
         setJobId(jobId);
         
         // Start polling for job status
@@ -189,6 +227,7 @@ export default function Home() {
         await checkJobStatus(jobId);
       } else if (data.outputs && data.outputs.length > 0) {
         // If we already have outputs (job already finished), process them
+        debugLog("Job already completed, processing outputs");
         const outputData = data.outputs[0].data;
         if (outputData && outputData.en && outputData.en.url) {
           setTranscriptUrl(outputData.en.url);
@@ -199,6 +238,8 @@ export default function Home() {
             const vttData = await vttResponse.json();
             if (vttResponse.ok && vttData.content) {
               setTranscript(vttData.content);
+              // Set the transcript type
+              setTranscriptType(vttData.transcriptType || 'simple');
             } else {
               setTranscript({
                 message: "Transcript URL available but content couldn't be parsed",
@@ -207,6 +248,7 @@ export default function Home() {
               });
             }
           } catch (vttError) {
+            console.error("Error fetching VTT:", vttError);
             setTranscript({
               message: "Transcript URL available but couldn't be fetched",
               transcriptUrl: outputData.en.url,
@@ -266,73 +308,17 @@ export default function Home() {
           </button>
         </div>
 
-        {transcriptUrl && (
-          <div className="flex justify-center">
-            <button
-              onClick={downloadRawTranscript}
-              className="py-2 px-4 rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Download Raw Transcript
-            </button>
-          </div>
-        )}
-
-        {error && (
-          <div className="p-4 rounded-md bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800">
-            {error}
-          </div>
-        )}
-
-        {jobId && !error && (
-          <div className="p-4 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-            <p className="flex items-center">
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Processing video transcript... (Job ID: {jobId})
-            </p>
-          </div>
-        )}
-
-        {transcript && Array.isArray(transcript) && (
-          <div className="p-6 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-            <h2 className="text-xl font-bold mb-4">Transcript</h2>
-            <div className="space-y-4">
-              {transcript.map((cue, index) => (
-                <div key={index} className="pb-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
-                  <div className="text-xs text-gray-500 mb-1">{cue.startTime} → {cue.endTime}</div>
-                  <p>{cue.text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {transcript && !Array.isArray(transcript) && (
-          <div className="p-6 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-            <h2 className="text-xl font-bold mb-4">Transcript Data</h2>
-            {transcriptUrl && (
-              <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded">
-                <p className="font-medium">Transcript URL:</p>
-                <a 
-                  href={transcriptUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="break-all text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  {transcriptUrl}
-                </a>
-              </div>
-            )}
-            <pre className="whitespace-pre-wrap overflow-auto max-h-[500px] font-[family-name:var(--font-geist-mono)] text-sm p-4 bg-gray-50 dark:bg-gray-900 rounded">
-              {JSON.stringify(transcript, null, 2)}
-            </pre>
-          </div>
-        )}
+        {transcriptUrl && <DownloadButton onDownload={downloadRawTranscript} />}
+        
+        <ErrorMessage message={error} />
+        
+        {!error && <JobStatus jobId={jobId} />}
+        
+        <TranscriptDisplay 
+          transcript={transcript} 
+          transcriptUrl={transcriptUrl} 
+          transcriptType={transcriptType}
+        />
       </main>
       
       <footer className="mt-auto py-6 text-center text-gray-500 text-sm">

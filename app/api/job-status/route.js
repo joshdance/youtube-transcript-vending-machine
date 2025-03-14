@@ -1,3 +1,6 @@
+// Toggle for development logging
+const DEV_MODE = false;
+
 export async function GET(request) {
   try {
     // Get the job ID from the URL query parameters
@@ -27,7 +30,11 @@ export async function GET(request) {
     });
     
     const data = await response.json();
-    console.log("Job status response:", data);
+    
+    // Only log in dev mode
+    if (DEV_MODE) {
+      console.log("Job status response:", data);
+    }
     
     if (!response.ok) {
       return Response.json(

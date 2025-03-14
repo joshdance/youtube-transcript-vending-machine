@@ -1,3 +1,6 @@
+// Toggle for development logging
+const DEV_MODE = false;
+
 export async function POST(request) {
   try {
     const { url } = await request.json();
@@ -42,14 +45,21 @@ export async function POST(request) {
       })
     };
 
-    console.log("Sending request to Sieve:", JSON.stringify(options.body, null, 2));
+    // Only log in dev mode
+    if (DEV_MODE) {
+      console.log("Sending request to Sieve:", JSON.stringify(options.body, null, 2));
+    }
 
     const response = await fetch('https://mango.sievedata.com/v2/push', options);
     const data = await response.json();
     
-    console.log("Sieve API response:", data);
+    // Only log in dev mode
+    if (DEV_MODE) {
+      console.log("Sieve API response:", data);
+    }
     
     if (!response.ok) {
+      // Always log errors
       console.error('Sieve API error:', data);
       return Response.json(
         { error: data.error || "Failed to get transcript from Sieve API" }, 
