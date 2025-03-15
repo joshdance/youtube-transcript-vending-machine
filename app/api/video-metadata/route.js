@@ -72,6 +72,7 @@ export async function GET(request) {
       description: snippet.description,
       publishedAt: snippet.publishedAt,
       channelTitle: snippet.channelTitle,
+      channelId: snippet.channelId, // Include the channel ID
       thumbnailUrl: snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url,
       viewCount: statistics.viewCount,
       likeCount: statistics.likeCount,

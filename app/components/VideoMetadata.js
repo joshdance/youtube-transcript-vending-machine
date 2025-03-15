@@ -6,12 +6,16 @@ export default function VideoMetadata({ metadata, videoUrl }) {
   const {
     title,
     channelTitle,
+    channelId,
     publishedAt,
     viewCount,
     likeCount,
     description,
     thumbnailUrl,
   } = metadata;
+
+  // Create YouTube channel URL from channel ID
+  const channelUrl = channelId ? `https://www.youtube.com/channel/${channelId}` : null;
 
   // Format date
   const formattedDate = publishedAt ? new Date(publishedAt).toLocaleDateString() : '';
@@ -27,13 +31,25 @@ export default function VideoMetadata({ metadata, videoUrl }) {
       <div className="flex flex-col md:flex-row gap-6">
         {thumbnailUrl && (
           <div className="flex-shrink-0 aspect-video w-full md:w-64 h-auto relative overflow-hidden rounded-md">
-            <Image 
-              src={thumbnailUrl} 
-              alt={title || "Video thumbnail"} 
-              width={640}
-              height={360}
-              className="object-cover"
-            />
+            {videoUrl ? (
+              <a href={videoUrl} target="_blank" rel="noopener noreferrer">
+                <Image 
+                  src={thumbnailUrl} 
+                  alt={title || "Video thumbnail"} 
+                  width={640}
+                  height={360}
+                  className="object-cover"
+                />
+              </a>
+            ) : (
+              <Image 
+                src={thumbnailUrl} 
+                alt={title || "Video thumbnail"} 
+                width={640}
+                height={360}
+                className="object-cover"
+              />
+            )}
           </div>
         )}
         
@@ -54,7 +70,22 @@ export default function VideoMetadata({ metadata, videoUrl }) {
           </h2>
           
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 dark:text-gray-400 mb-3">
-            {channelTitle && <span>{channelTitle}</span>}
+            {channelTitle && (
+              <span>
+                {channelUrl ? (
+                  <a 
+                    href={channelUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  >
+                    {channelTitle}
+                  </a>
+                ) : (
+                  channelTitle
+                )}
+              </span>
+            )}
             {formattedDate && <span>• {formattedDate}</span>}
             {formattedViewCount && <span>• {formattedViewCount} views</span>}
             {formattedLikeCount && <span>• {formattedLikeCount} likes</span>}
