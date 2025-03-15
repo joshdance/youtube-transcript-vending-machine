@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import CopyButton from './CopyButton';
 
 const AiSummary = ({ transcript, onSummaryGenerated }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -54,6 +55,7 @@ const AiSummary = ({ transcript, onSummaryGenerated }) => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
         <h2 className="text-xl font-bold">AI Summary</h2>
         <div className="flex gap-2 mt-2 sm:mt-0">
+          {summary && <CopyButton content={summary} label="Summary" />}
           <button
             onClick={() => setShowPromptEditor(!showPromptEditor)}
             className="px-3 py-1 text-sm bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors"
@@ -97,11 +99,11 @@ const AiSummary = ({ transcript, onSummaryGenerated }) => {
 
       {summary ? (
         <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-md overflow-auto max-h-[500px]">
-          <div className="prose dark:prose-invert max-w-none">
+          <article className="prose prose-sm sm:prose lg:prose-lg dark:prose-invert max-w-none">
             <ReactMarkdown>
               {summary}
             </ReactMarkdown>
-          </div>
+          </article>
         </div>
       ) : (
         <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-md text-gray-500 dark:text-gray-400 text-center">

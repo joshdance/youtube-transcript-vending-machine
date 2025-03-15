@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import TranscriptTypeBadge from './TranscriptTypeBadge';
 import TranscriptViewToggle from './TranscriptViewToggle';
+import CopyButton from './CopyButton';
 import { processTranscriptAlgo1, cleanText } from '../utils/transcriptAlgo1';
 
 const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType }) => {
@@ -13,15 +14,23 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType }) => {
   const handleViewChange = (mode) => {
     setViewMode(mode);
   };
+
+  // Helper to get content for Raw view
+  const getRawContent = () => {
+    return JSON.stringify(transcript, null, 2);
+  };
   
   // Raw view mode - shows the raw transcript data
   if (viewMode === 'raw' && transcriptUrl) {
+    const rawContent = getRawContent();
+    
     return (
       <div className="p-6 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
           <h2 className="text-xl font-bold">Raw Transcript Data</h2>
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <TranscriptTypeBadge type={transcriptType} />
+            <CopyButton content={rawContent} label="Raw" />
             <TranscriptViewToggle activeView={viewMode} onViewChange={handleViewChange} />
           </div>
         </div>
@@ -40,11 +49,11 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType }) => {
         
         {Array.isArray(transcript) ? (
           <pre className="whitespace-pre-wrap overflow-auto max-h-[500px] font-[family-name:var(--font-geist-mono)] text-sm p-4 bg-gray-50 dark:bg-gray-900 rounded">
-            {JSON.stringify(transcript, null, 2)}
+            {rawContent}
           </pre>
         ) : (
           <pre className="whitespace-pre-wrap overflow-auto max-h-[500px] font-[family-name:var(--font-geist-mono)] text-sm p-4 bg-gray-50 dark:bg-gray-900 rounded">
-            {JSON.stringify(transcript, null, 2)}
+            {rawContent}
           </pre>
         )}
       </div>
@@ -62,12 +71,18 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType }) => {
       ? processedTranscript.filter(cue => cue && cue.text && cue.text.trim() !== '')
       : transcript;
     
+    // Generate content for copy
+    const timestampContent = validProcessedTranscript.map(cue => 
+      `[${cue.startTime} → ${cue.endTime}] ${cue.text}`
+    ).join('\n');
+    
     return (
       <div className="p-6 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
           <h2 className="text-xl font-bold">Transcript with Timestamps</h2>
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <TranscriptTypeBadge type={transcriptType} />
+            <CopyButton content={timestampContent} label="Timestamps" />
             <TranscriptViewToggle activeView={viewMode} onViewChange={handleViewChange} />
           </div>
         </div>
@@ -104,6 +119,7 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType }) => {
           <h2 className="text-xl font-bold">Text Only</h2>
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <TranscriptTypeBadge type={transcriptType} />
+            <CopyButton content={textContent} label="Text" />
             <TranscriptViewToggle activeView={viewMode} onViewChange={handleViewChange} />
           </div>
         </div>
@@ -115,12 +131,14 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType }) => {
   }
   
   // Default view as fallback - If transcript is an object (usually for debug/error info)
+  const defaultContent = JSON.stringify(transcript, null, 2);
   return (
     <div className="p-6 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
         <h2 className="text-xl font-bold">Transcript Data</h2>
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           {transcriptType && <TranscriptTypeBadge type={transcriptType} />}
+          <CopyButton content={defaultContent} label="Data" />
           <TranscriptViewToggle activeView={viewMode} onViewChange={handleViewChange} />
         </div>
       </div>
@@ -138,7 +156,7 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType }) => {
         </div>
       )}
       <pre className="whitespace-pre-wrap overflow-auto max-h-[500px] font-[family-name:var(--font-geist-mono)] text-sm p-4 bg-gray-50 dark:bg-gray-900 rounded">
-        {JSON.stringify(transcript, null, 2)}
+        {defaultContent}
       </pre>
     </div>
   );

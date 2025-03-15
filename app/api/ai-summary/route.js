@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { generateAiSummaryPrompt } from "../../utils/aiSummaryPrompt";
+import DEFAULT_PROMPT from "../../utils/aiSummaryPrompt";
 
 // Toggle for development logging
 const DEV_MODE = false;
@@ -29,10 +30,44 @@ export async function POST(request) {
 
     // Initialize the Google Generative AI client
     const genAI = new GoogleGenerativeAI(GOOGLE_GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    
+    // Use the Gemini flash model
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash"
+    });
 
     // Create the prompt for summary generation
-    const prompt = generateAiSummaryPrompt(transcript, customPrompt);
+    const promptPrefix = `${customPrompt || DEFAULT_PROMPT}
+    
+Format your response using markdown with:
+- Headers for sections (use # for main headers, ## for subheaders)
+- Bullet points for key information
+- Bold or italic text for emphasis
+- Quotes for notable statements from the transcript
+
+Create a well-structured summary with:
+1. A brief overview paragraph
+2. Main themes/topics section
+3. Key points or takeaways
+4. Any surprising or unusual findings
+5. Conclusion
+
+Your response MUST be in markdown format. For example:
+# Overview
+Brief overview text here...
+
+## Main Themes
+* Theme 1: description
+* Theme 2: description
+
+## Key Points
+* Important point 1
+* Important point 2
+
+Here is the transcript:
+`;
+
+    const prompt = generateAiSummaryPrompt(transcript, promptPrefix);
     
     // Log in dev mode
     if (DEV_MODE) {
