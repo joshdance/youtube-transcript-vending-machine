@@ -1,21 +1,11 @@
 import React, { useState } from 'react';
 import TranscriptTypeBadge from './TranscriptTypeBadge';
 import TranscriptViewToggle from './TranscriptViewToggle';
-
-// Helper function to clean transcript text
-const cleanTranscriptText = (text) => {
-  if (!text) return '';
-  
-  // Remove word-by-word specific markup
-  return text
-    .replace(/<\d\d:\d\d:\d\d\.\d+>/g, '') // Remove timestamp markers like <00:00:00.000>
-    .replace(/<\/?\w>/g, '')               // Remove style tags like <c> and </c>
-    .replace(/\s+/g, ' ')                  // Normalize whitespace
-    .trim();
-};
+import { processTranscriptAlgo1, cleanText } from '../utils/transcriptAlgo1';
 
 const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType }) => {
-  const [viewMode, setViewMode] = useState('simple');
+  // Default to timestamps view
+  const [viewMode, setViewMode] = useState('timestamps');
   
   if (!transcript) return null;
   
@@ -29,7 +19,7 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType }) => {
     return (
       <div className="p-6 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-          <h2 className="text-xl font-bold">Transcript</h2>
+          <h2 className="text-xl font-bold">Raw Transcript Data</h2>
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <TranscriptTypeBadge type={transcriptType} />
             <TranscriptViewToggle activeView={viewMode} onViewChange={handleViewChange} />
@@ -61,42 +51,28 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType }) => {
     );
   }
   
-  // Cleaned view mode - shows cleaned transcript text
-  if (viewMode === 'cleaned' && Array.isArray(transcript)) {
+  // Transcript with Timestamps view mode (using Algo 1)
+  if (viewMode === 'timestamps' && Array.isArray(transcript)) {
+    console.log('Original transcript for timestamps view:', transcript.length, 'entries');
+    const processedTranscript = processTranscriptAlgo1(transcript);
+    console.log('Processed transcript for timestamps view:', processedTranscript.length, 'entries');
+    
+    // Make sure we have valid results to display
+    const validProcessedTranscript = Array.isArray(processedTranscript) && processedTranscript.length > 0
+      ? processedTranscript.filter(cue => cue && cue.text && cue.text.trim() !== '')
+      : transcript;
+    
     return (
       <div className="p-6 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-          <h2 className="text-xl font-bold">Transcript</h2>
+          <h2 className="text-xl font-bold">Transcript with Timestamps</h2>
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <TranscriptTypeBadge type={transcriptType} />
             <TranscriptViewToggle activeView={viewMode} onViewChange={handleViewChange} />
           </div>
         </div>
         <div className="space-y-4">
-          {transcript.map((cue, index) => (
-            <div key={index} className="pb-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
-              <div className="text-xs text-gray-500 mb-1">{cue.startTime} → {cue.endTime}</div>
-              <p>{cleanTranscriptText(cue.text)}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  
-  // Simple view mode - shows the formatted transcript without cleaning
-  if (Array.isArray(transcript)) {
-    return (
-      <div className="p-6 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-          <h2 className="text-xl font-bold">Transcript</h2>
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-            <TranscriptTypeBadge type={transcriptType} />
-            <TranscriptViewToggle activeView={viewMode} onViewChange={handleViewChange} />
-          </div>
-        </div>
-        <div className="space-y-4">
-          {transcript.map((cue, index) => (
+          {validProcessedTranscript.map((cue, index) => (
             <div key={index} className="pb-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
               <div className="text-xs text-gray-500 mb-1">{cue.startTime} → {cue.endTime}</div>
               <p>{cue.text}</p>
@@ -107,7 +83,38 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType }) => {
     );
   }
   
-  // If transcript is an object (usually for debug/error info)
+  // Text Only view mode - displays just the text without timestamps
+  if (viewMode === 'textonly' && Array.isArray(transcript)) {
+    // Use the same processing as timestamps view, but join all lines into a single text block
+    console.log('Original transcript for text-only view:', transcript.length, 'entries');
+    const processedTranscript = processTranscriptAlgo1(transcript);
+    console.log('Processed transcript for text-only view:', processedTranscript.length, 'entries');
+    
+    // Make sure we have valid results
+    const validProcessedTranscript = Array.isArray(processedTranscript) && processedTranscript.length > 0
+      ? processedTranscript.filter(cue => cue && cue.text && cue.text.trim() !== '')
+      : transcript;
+    
+    // Extract just the text content without timestamps
+    const textContent = validProcessedTranscript.map(cue => cue.text).join(' ');
+    
+    return (
+      <div className="p-6 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+          <h2 className="text-xl font-bold">Text Only</h2>
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <TranscriptTypeBadge type={transcriptType} />
+            <TranscriptViewToggle activeView={viewMode} onViewChange={handleViewChange} />
+          </div>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded">
+          <p className="leading-relaxed">{textContent}</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Default view as fallback - If transcript is an object (usually for debug/error info)
   return (
     <div className="p-6 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">

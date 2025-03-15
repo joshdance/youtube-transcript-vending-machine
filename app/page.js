@@ -5,6 +5,7 @@ import JobStatus from "./components/JobStatus";
 import ErrorMessage from "./components/ErrorMessage";
 import DownloadButton from "./components/DownloadButton";
 import TranscriptDisplay from "./components/TranscriptDisplay";
+import VideoMetadata from "./components/VideoMetadata";
 
 // Toggle for development logging
 const DEV_MODE = false;
@@ -18,6 +19,7 @@ export default function Home() {
   const [transcriptType, setTranscriptType] = useState(null);
   const [error, setError] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
+  const [videoMetadata, setVideoMetadata] = useState(null);
 
   // Debug logging function to control output
   const debugLog = (...args) => {
@@ -44,6 +46,31 @@ export default function Home() {
       setPollingInterval(null);
     }
   }, [transcript, pollingInterval]);
+
+  // Function to fetch video metadata
+  const fetchVideoMetadata = async (videoUrl) => {
+    if (!videoUrl) {
+      throw new Error('Tried to fetch video metadata but there was no video URL');
+      return;
+    }
+    
+    try {
+      debugLog("Fetching video metadata for:", videoUrl);
+      const response = await fetch(`/api/video-metadata?url=${encodeURIComponent(videoUrl)}`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch video metadata");
+      }
+      
+      debugLog("Video metadata received:", data.metadata);
+      setVideoMetadata(data.metadata);
+    } catch (err) {
+      console.error("Error fetching video metadata:", err);
+      // Don't set error state here to avoid blocking the transcript fetch
+      // Just log the error
+    }
+  };
 
   // Function to download the raw transcript
   const downloadRawTranscript = async () => {
@@ -186,6 +213,7 @@ export default function Home() {
     setTranscript(null);
     setTranscriptUrl(null);
     setTranscriptType(null);
+    setVideoMetadata(null);
     
     // Clear any existing polling
     if (pollingInterval) {
@@ -193,6 +221,9 @@ export default function Home() {
       clearInterval(pollingInterval);
       setPollingInterval(null);
     }
+
+    // Fetch video metadata
+    fetchVideoMetadata(url);
 
     try {
       debugLog("Fetching transcript for URL:", url);
@@ -313,6 +344,8 @@ export default function Home() {
         <ErrorMessage message={error} />
         
         {!error && <JobStatus jobId={jobId} />}
+        
+        {videoMetadata && <VideoMetadata metadata={videoMetadata} videoUrl={url} />}
         
         <TranscriptDisplay 
           transcript={transcript} 
