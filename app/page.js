@@ -6,6 +6,7 @@ import ErrorMessage from "./components/ErrorMessage";
 import DownloadButton from "./components/DownloadButton";
 import TranscriptDisplay from "./components/TranscriptDisplay";
 import VideoMetadata from "./components/VideoMetadata";
+import AiSummary from "./components/AiSummary";
 
 // Toggle for development logging
 const DEV_MODE = false;
@@ -20,6 +21,7 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
   const [videoMetadata, setVideoMetadata] = useState(null);
+  const [aiSummary, setAiSummary] = useState(null);
 
   // Debug logging function to control output
   const debugLog = (...args) => {
@@ -352,6 +354,13 @@ export default function Home() {
           transcriptUrl={transcriptUrl} 
           transcriptType={transcriptType}
         />
+        
+        {transcript && (
+          <AiSummary 
+            transcript={transcript} 
+            onSummaryGenerated={(summary) => setAiSummary(summary)}
+          />
+        )}
       </main>
       
       <footer className="mt-auto py-6 text-center text-gray-500 text-sm">
