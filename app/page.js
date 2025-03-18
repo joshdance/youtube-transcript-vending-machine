@@ -483,8 +483,6 @@ export default function Home() {
           </div>
         )}
 
-        {transcriptUrl && <DownloadButton onDownload={downloadRawTranscript} />}
-        
         <ErrorMessage message={error} />
         
         {!error && <JobStatus jobId={jobId} />}
@@ -514,11 +512,15 @@ export default function Home() {
           />
         )}
         
-        <TranscriptDisplay 
-          transcript={transcript} 
-          transcriptUrl={transcriptUrl} 
-          transcriptType={transcriptType}
-        />
+        {transcript && (
+          <TranscriptDisplay
+            transcript={transcript}
+            transcriptUrl={transcriptUrl}
+            transcriptType={transcriptType}
+            duration={videoMetadata?.duration}
+            onDownloadRawTranscript={downloadRawTranscript}
+          />
+        )}
         
         {transcript && (
           <AiSummary 
@@ -529,7 +531,20 @@ export default function Home() {
       </main>
       
       <footer className="mt-auto py-6 text-center text-gray-500 text-sm">
-        Powered by Sieve and Next.js
+        Made with <span className="heart cursor-pointer select-none">❤️</span> by <a href="https://twitter.com/joshdance" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Josh Dance</a>
+      <style jsx>{`
+        @keyframes heartbeat {
+          0% { transform: scale(1); }
+          25% { transform: scale(1.1); }
+          50% { transform: scale(1); }
+          75% { transform: scale(1.1); }
+          100% { transform: scale(1); }
+        }
+        .heart:hover {
+          display: inline-block;
+          animation: heartbeat 1s ease-in-out infinite;
+        }
+      `}</style>
       </footer>
     </div>
   );

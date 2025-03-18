@@ -3,7 +3,7 @@ import React from 'react';
 const TranscriptViewToggle = ({ activeView, onViewChange }) => {
   // Define available views
   const views = [
-    { id: 'timestamps', label: 'Transcript with Timestamps' },
+    { id: 'timestamps', label: 'Transcript' },
     { id: 'textonly', label: 'Text Only' },
     { id: 'raw', label: 'Raw' }
   ];

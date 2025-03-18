@@ -46,7 +46,7 @@ export async function GET(request) {
   try {
     // Fetch video details
     const videoResponse = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet,statistics&key=${apiKey}`
+      `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet,statistics,contentDetails&key=${apiKey}`
     );
     
     const videoData = await videoResponse.json();
@@ -65,6 +65,23 @@ export async function GET(request) {
     const item = videoData.items[0];
     const snippet = item.snippet || {};
     const statistics = item.statistics || {};
+    const contentDetails = item.contentDetails || {};
+    
+    // Format duration from ISO 8601 to MM:SS
+    const formatDuration = (duration) => {
+      if (!duration) return '';
+      const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+      if (!match) return '';
+      
+      const hours = (match[1] || '').replace('H', '');
+      const minutes = (match[2] || '').replace('M', '');
+      const seconds = (match[3] || '').replace('S', '');
+      
+      if (hours) {
+        return `${hours}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}`;
+      }
+      return `${minutes}:${seconds.padStart(2, '0')}`;
+    };
     
     // Extract the metadata we need
     const metadata = {
@@ -72,11 +89,12 @@ export async function GET(request) {
       description: snippet.description,
       publishedAt: snippet.publishedAt,
       channelTitle: snippet.channelTitle,
-      channelId: snippet.channelId, // Include the channel ID
+      channelId: snippet.channelId,
       thumbnailUrl: snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url,
       viewCount: statistics.viewCount,
       likeCount: statistics.likeCount,
       commentCount: statistics.commentCount,
+      duration: formatDuration(contentDetails.duration),
     };
     
     return NextResponse.json({ metadata });
