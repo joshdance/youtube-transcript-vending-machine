@@ -22,6 +22,11 @@ export default function Home() {
   const [pollingInterval, setPollingInterval] = useState(null);
   const [videoMetadata, setVideoMetadata] = useState(null);
   const [aiSummary, setAiSummary] = useState(null);
+  const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
+  const [playlistVideos, setPlaylistVideos] = useState(null);
+  const [isPlaylist, setIsPlaylist] = useState(false);
+  const [loadingStates, setLoadingStates] = useState({});
+  const [processingStates, setProcessingStates] = useState({});
 
   // Debug logging function to control output
   const debugLog = (...args) => {
@@ -29,6 +34,133 @@ export default function Home() {
       console.log(...args);
     }
   };
+
+  // Validate YouTube URL format
+  const isValidYouTubeUrl = (url) => {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname;
+      
+      // Check for youtube.com or youtu.be domains
+      if (!hostname.includes('youtube.com') && !hostname.includes('youtu.be')) {
+        return { isValid: false, type: 'invalid', message: 'Not a YouTube URL' };
+      }
+
+      if (hostname.includes('youtube.com')) {
+        const hasPlaylistId = urlObj.searchParams.has('list');
+        const isPlaylistPage = urlObj.pathname === '/playlist';
+        const hasVideoId = urlObj.searchParams.has('v');
+
+        // Pure playlist URL
+        if (isPlaylistPage && hasPlaylistId) {
+          return { 
+            isValid: true, 
+            type: 'playlist',
+            playlistId: urlObj.searchParams.get('list'),
+            message: null 
+          };
+        }
+
+        // Video within playlist
+        if (hasVideoId && hasPlaylistId) {
+          return { 
+            isValid: true, 
+            type: 'video_in_playlist',
+            videoId: urlObj.searchParams.get('v'),
+            playlistId: urlObj.searchParams.get('list'),
+            message: null 
+          };
+        }
+
+        // Single video
+        if (hasVideoId) {
+          return { 
+            isValid: true, 
+            type: 'video',
+            videoId: urlObj.searchParams.get('v'),
+            message: null 
+          };
+        }
+
+        return { isValid: false, type: 'invalid', message: 'Invalid YouTube URL format' };
+      } else {
+        // youtu.be links
+        return { 
+          isValid: urlObj.pathname.length > 1,
+          type: 'video',
+          videoId: urlObj.pathname.slice(1),
+          message: null
+        };
+      }
+    } catch (e) {
+      return { isValid: false, type: 'invalid', message: 'Invalid URL format' };
+    }
+  };
+
+  // Effect to fetch metadata when URL changes
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      if (!url) {
+        setVideoMetadata(null);
+        setPlaylistVideos(null);
+        setIsPlaylist(false);
+        return;
+      }
+
+      // Only proceed if URL is valid
+      const urlValidation = isValidYouTubeUrl(url);
+      if (!urlValidation.isValid) {
+        setError(urlValidation.message || "Please enter a valid YouTube URL");
+        setVideoMetadata(null);
+        setPlaylistVideos(null);
+        setIsPlaylist(false);
+        return;
+      }
+
+      setIsFetchingMetadata(true);
+      setError(null);
+      
+      try {
+        if (urlValidation.type === 'playlist' || urlValidation.type === 'video_in_playlist') {
+          // Fetch playlist videos
+          const playlistResponse = await fetch(`/api/playlist-videos?playlistId=${urlValidation.playlistId}`);
+          const playlistData = await playlistResponse.json();
+          
+          if (!playlistResponse.ok) {
+            throw new Error(playlistData.error || "Failed to fetch playlist videos");
+          }
+          
+          setPlaylistVideos(playlistData.videos);
+          setIsPlaylist(true);
+          setVideoMetadata(null); // Clear single video metadata
+        } else {
+          // Fetch single video metadata
+          const response = await fetch(`/api/video-metadata?url=${encodeURIComponent(url)}`);
+          const data = await response.json();
+          
+          if (!response.ok) {
+            throw new Error(data.error || "Failed to fetch video metadata");
+          }
+          
+          setVideoMetadata(data.metadata);
+          setPlaylistVideos(null);
+          setIsPlaylist(false);
+        }
+      } catch (err) {
+        console.error("Error fetching metadata:", err);
+        setError(err.message || "Failed to fetch metadata");
+        setVideoMetadata(null);
+        setPlaylistVideos(null);
+        setIsPlaylist(false);
+      } finally {
+        setIsFetchingMetadata(false);
+      }
+    };
+
+    // Add a small delay to avoid too many API calls while typing
+    const timeoutId = setTimeout(fetchMetadata, 500);
+    return () => clearTimeout(timeoutId);
+  }, [url]);
 
   // Clean up polling on unmount or when job completes
   useEffect(() => {
@@ -48,31 +180,6 @@ export default function Home() {
       setPollingInterval(null);
     }
   }, [transcript, pollingInterval]);
-
-  // Function to fetch video metadata
-  const fetchVideoMetadata = async (videoUrl) => {
-    if (!videoUrl) {
-      throw new Error('Tried to fetch video metadata but there was no video URL');
-      return;
-    }
-    
-    try {
-      debugLog("Fetching video metadata for:", videoUrl);
-      const response = await fetch(`/api/video-metadata?url=${encodeURIComponent(videoUrl)}`);
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch video metadata");
-      }
-      
-      debugLog("Video metadata received:", data.metadata);
-      setVideoMetadata(data.metadata);
-    } catch (err) {
-      console.error("Error fetching video metadata:", err);
-      // Don't set error state here to avoid blocking the transcript fetch
-      // Just log the error
-    }
-  };
 
   // Function to download the raw transcript
   const downloadRawTranscript = async () => {
@@ -108,7 +215,7 @@ export default function Home() {
   };
 
   // Function to check job status
-  const checkJobStatus = async (id) => {
+  const checkJobStatus = async (id, videoId) => {
     if (!id) return;
     
     try {
@@ -129,6 +236,9 @@ export default function Home() {
           clearInterval(pollingInterval);
           setPollingInterval(null);
         }
+        
+        // Clear processing state for this specific video
+        setProcessingStates(prev => ({ ...prev, [videoId]: false }));
         
         // Extract transcript URL if available
         if (data.outputs && data.outputs.length > 0 && data.outputs[0].data) {
@@ -195,6 +305,9 @@ export default function Home() {
       console.error("Error checking job status:", err);
       setError(err.message || "Failed to check job status");
       
+      // Clear processing state for this specific video
+      setProcessingStates(prev => ({ ...prev, [videoId]: false }));
+      
       // Clear polling interval
       if (pollingInterval) {
         debugLog("Error in job status check, clearing interval");
@@ -204,18 +317,21 @@ export default function Home() {
     }
   };
 
-  const fetchTranscript = async () => {
-    if (!url) {
+  const fetchTranscript = async (videoUrl = null) => {
+    const targetUrl = videoUrl || url;
+    const videoId = isValidYouTubeUrl(targetUrl).videoId;
+    
+    if (!targetUrl) {
       setError("Please enter a YouTube URL");
       return;
     }
 
-    setIsLoading(true);
+    // Update loading state for this specific video
+    setLoadingStates(prev => ({ ...prev, [videoId]: true }));
     setError(null);
     setTranscript(null);
     setTranscriptUrl(null);
     setTranscriptType(null);
-    setVideoMetadata(null);
     
     // Clear any existing polling
     if (pollingInterval) {
@@ -224,17 +340,14 @@ export default function Home() {
       setPollingInterval(null);
     }
 
-    // Fetch video metadata
-    fetchVideoMetadata(url);
-
     try {
-      debugLog("Fetching transcript for URL:", url);
+      debugLog("Fetching transcript for URL:", targetUrl);
       const response = await fetch("/api/transcripts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: targetUrl }),
       });
 
       const data = await response.json();
@@ -251,13 +364,15 @@ export default function Home() {
       if (jobId) {
         debugLog("Got job ID:", jobId);
         setJobId(jobId);
+        // Update processing state for this specific video
+        setProcessingStates(prev => ({ ...prev, [videoId]: true }));
         
         // Start polling for job status
-        const interval = setInterval(() => checkJobStatus(jobId), 5000);
+        const interval = setInterval(() => checkJobStatus(jobId, videoId), 5000);
         setPollingInterval(interval);
         
         // Also check immediately
-        await checkJobStatus(jobId);
+        await checkJobStatus(jobId, videoId);
       } else if (data.outputs && data.outputs.length > 0) {
         // If we already have outputs (job already finished), process them
         debugLog("Job already completed, processing outputs");
@@ -307,7 +422,8 @@ export default function Home() {
       console.error("Error fetching transcript:", err);
       setError(err.message || "An error occurred while fetching the transcript");
     } finally {
-      setIsLoading(false);
+      // Clear loading state for this specific video
+      setLoadingStates(prev => ({ ...prev, [videoId]: false }));
     }
   };
 
@@ -328,18 +444,44 @@ export default function Home() {
             type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://www.youtube.com/watch?v=..."
+            placeholder="https://www.youtube.com/watch?v=... or https://www.youtube.com/playlist?list=..."
             className="flex-grow p-3 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
-            disabled={isLoading || jobId}
+            disabled={Object.values(loadingStates).some(Boolean) || Object.values(processingStates).some(Boolean)}
           />
-          <button
-            onClick={fetchTranscript}
-            disabled={isLoading || jobId}
-            className="py-3 px-6 rounded-md bg-foreground text-background hover:bg-[#383838] dark:hover:bg-[#ccc] transition-colors font-medium disabled:opacity-50"
-          >
-            {isLoading ? "Loading..." : jobId ? "Processing..." : "Get Transcript"}
-          </button>
+          {isPlaylist && playlistVideos ? (
+            <button
+              onClick={() => fetchTranscript(url)}
+              disabled={Object.values(loadingStates).some(Boolean) || Object.values(processingStates).some(Boolean)}
+              className="py-3 px-6 rounded-md bg-foreground text-background hover:bg-[#383838] dark:hover:bg-[#ccc] transition-colors font-medium disabled:opacity-50"
+            >
+              {Object.values(loadingStates).some(Boolean) ? "Loading..." : 
+               Object.values(processingStates).some(Boolean) ? "Processing..." : 
+               `Get Transcripts (${playlistVideos.length} videos)`}
+            </button>
+          ) : (
+            <button
+              onClick={() => fetchTranscript(url)}
+              disabled={Object.values(loadingStates).some(Boolean) || Object.values(processingStates).some(Boolean) || !videoMetadata}
+              className="py-3 px-6 rounded-md bg-foreground text-background hover:bg-[#383838] dark:hover:bg-[#ccc] transition-colors font-medium disabled:opacity-50"
+            >
+              {Object.values(loadingStates).some(Boolean) ? "Loading..." : 
+               Object.values(processingStates).some(Boolean) ? "Processing..." : 
+               "Get Transcript"}
+            </button>
+          )}
         </div>
+
+        {isFetchingMetadata && (
+          <div className="p-4 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+            <p className="flex items-center">
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {isPlaylist ? "Fetching playlist information..." : "Fetching video information..."}
+            </p>
+          </div>
+        )}
 
         {transcriptUrl && <DownloadButton onDownload={downloadRawTranscript} />}
         
@@ -347,7 +489,30 @@ export default function Home() {
         
         {!error && <JobStatus jobId={jobId} />}
         
-        {videoMetadata && <VideoMetadata metadata={videoMetadata} videoUrl={url} />}
+        {playlistVideos && (
+          <div className="w-full space-y-4">
+            {playlistVideos.map((video) => (
+              <VideoMetadata 
+                key={video.id}
+                metadata={video}
+                videoUrl={`https://www.youtube.com/watch?v=${video.id}`}
+                onTranscriptRequest={() => fetchTranscript(`https://www.youtube.com/watch?v=${video.id}`)}
+                isLoading={loadingStates[video.id]}
+                isProcessing={processingStates[video.id]}
+              />
+            ))}
+          </div>
+        )}
+        
+        {!isPlaylist && videoMetadata && (
+          <VideoMetadata 
+            metadata={videoMetadata} 
+            videoUrl={url}
+            onTranscriptRequest={() => fetchTranscript(url)}
+            isLoading={loadingStates[isValidYouTubeUrl(url).videoId]}
+            isProcessing={processingStates[isValidYouTubeUrl(url).videoId]}
+          />
+        )}
         
         <TranscriptDisplay 
           transcript={transcript} 

@@ -1,6 +1,9 @@
 import Image from 'next/image';
+import { useState } from 'react';
 
-export default function VideoMetadata({ metadata, videoUrl }) {
+export default function VideoMetadata({ metadata, videoUrl, onTranscriptRequest, isLoading, isProcessing }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
   if (!metadata) return null;
 
   const {
@@ -53,25 +56,37 @@ export default function VideoMetadata({ metadata, videoUrl }) {
           </div>
         )}
         
-        <div className="flex-1">
-          <h2 className="text-xl font-bold mb-2">
-            {videoUrl ? (
-              <a 
-                href={videoUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-              >
-                {title}
-              </a>
-            ) : (
-              title
-            )}
-          </h2>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-2">
+            <h2 className="text-xl font-bold break-words flex-1">
+              {videoUrl ? (
+                <a 
+                  href={videoUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  {title}
+                </a>
+              ) : (
+                title
+              )}
+            </h2>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                onTranscriptRequest();
+              }}
+              disabled={isLoading || isProcessing}
+              className="shrink-0 px-4 py-2 text-sm font-medium rounded-md bg-foreground text-background hover:bg-[#383838] dark:hover:bg-[#ccc] transition-colors disabled:opacity-50"
+            >
+              {isLoading ? "Loading..." : isProcessing ? "Processing..." : "Get Transcript"}
+            </button>
+          </div>
           
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 dark:text-gray-400 mb-3">
             {channelTitle && (
-              <span>
+              <span className="break-words">
                 {channelUrl ? (
                   <a 
                     href={channelUrl} 
@@ -92,8 +107,18 @@ export default function VideoMetadata({ metadata, videoUrl }) {
           </div>
           
           {description && (
-            <div className="mt-3 text-sm text-gray-700 dark:text-gray-300 line-clamp-3">
-              {description}
+            <div className="mt-3">
+              <div className={`text-sm text-gray-700 dark:text-gray-300 break-words ${!isExpanded ? 'line-clamp-3' : ''}`}>
+                {description}
+              </div>
+              {description.length > 150 && (
+                <button
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                >
+                  {isExpanded ? 'Show Less' : 'Show More'}
+                </button>
+              )}
             </div>
           )}
         </div>
