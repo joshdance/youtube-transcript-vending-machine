@@ -1,6 +1,32 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
-const JobStatus = ({ jobId }) => {
+const JobStatus = ({ jobId, onJobComplete }) => {
+  useEffect(() => {
+    if (!jobId) return;
+
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`/api/job-status?id=${jobId}`);
+        const data = await response.json();
+        
+        console.log('Job status response:', data);
+        // Check for both 'finished' and 'COMPLETED' status
+        if (data.status === 'COMPLETED' || data.status === 'finished') {
+          console.log('Job completed, calling onJobComplete with jobId:', jobId);
+          onJobComplete(jobId);
+        }
+      } catch (error) {
+        console.error('Error checking job status:', error);
+      }
+    };
+
+    // Check immediately and then every 2 seconds
+    checkStatus();
+    const interval = setInterval(checkStatus, 2000);
+
+    return () => clearInterval(interval);
+  }, [jobId, onJobComplete]);
+
   if (!jobId) return null;
   
   return (
@@ -16,4 +42,4 @@ const JobStatus = ({ jobId }) => {
   );
 };
 
-export default JobStatus; 
+export default JobStatus;

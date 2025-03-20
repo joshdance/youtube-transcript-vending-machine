@@ -33,7 +33,7 @@ function processTranscriptAlgo1(transcript) {
     return transcript;
   }
 
-  console.log('Processing with Algo 1:', transcript.length, 'entries');
+  console.log('Processing transcript:', transcript.length, 'entries');
   
   // First, filter out entries that don't have embedded timestamps
   const timestampedEntries = transcript.filter(entry => {
@@ -48,8 +48,6 @@ function processTranscriptAlgo1(transcript) {
     // Keep entries that have embedded timestamps (indicating actual content)
     return hasEmbeddedTimestamps;
   });
-
-  console.log('After timestamp filtering:', timestampedEntries.length, 'entries');
   
   // Process each entry to extract only parts with <c> elements
   const processedTranscript = timestampedEntries.map(entry => {
@@ -121,7 +119,7 @@ function processTranscriptAlgo1(transcript) {
     return modifiedEntry;
   }).filter(entry => entry.text.trim() !== ''); // Remove entries with empty text
 
-  console.log('Algo 1 result:', processedTranscript.length, 'entries');
+  console.log('Processed transcript:', processedTranscript.length, 'entries');
   return processedTranscript;
 }
 

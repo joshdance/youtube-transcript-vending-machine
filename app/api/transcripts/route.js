@@ -1,6 +1,73 @@
 // Toggle for development logging
 const DEV_MODE = false;
 
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const jobId = searchParams.get('jobId');
+    
+    if (!jobId) {
+      return Response.json({ error: "Job ID is required" }, { status: 400 });
+    }
+    
+    const SIEVE_API_KEY = process.env.SIEVE_API_KEY;
+    
+    if (!SIEVE_API_KEY) {
+      return Response.json(
+        { error: "Missing Sieve API key in server configuration" }, 
+        { status: 500 }
+      );
+    }
+
+    // Fetch the job result from Sieve
+    const response = await fetch(`https://mango.sievedata.com/v2/jobs/${jobId}/output`, {
+      headers: {
+        'X-API-Key': SIEVE_API_KEY,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    
+    if (DEV_MODE) {
+      console.log("Sieve job output:", data);
+    }
+
+    if (!response.ok) {
+      console.error('Error fetching job output:', data);
+      return Response.json(
+        { error: "Failed to get transcript from Sieve API" },
+        { status: response.status }
+      );
+    }
+
+    // Extract transcript and URLs from the response
+    const transcript = data.subtitles?.[0]?.text;
+    const url = data.subtitles?.[0]?.url;
+    const type = 'vtt'; // Sieve provides VTT format
+
+    if (!transcript || !url) {
+      console.error('Missing transcript or URL in response:', data);
+      return Response.json(
+        { error: "No transcript found in job output" },
+        { status: 404 }
+      );
+    }
+
+    return Response.json({
+      transcript,
+      url,
+      type
+    });
+  } catch (error) {
+    console.error('Error in transcripts GET route:', error);
+    return Response.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request) {
   try {
     const { url } = await request.json();

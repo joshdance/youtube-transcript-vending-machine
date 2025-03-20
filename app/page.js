@@ -3,15 +3,17 @@
 import { useState, useEffect } from "react";
 import JobStatus from "./components/JobStatus";
 import ErrorMessage from "./components/ErrorMessage";
-import DownloadButton from "./components/DownloadButton";
 import TranscriptDisplay from "./components/TranscriptDisplay";
 import VideoMetadata from "./components/VideoMetadata";
 import AiSummary from "./components/AiSummary";
+import { supabase } from "./utils/supabase";
+import AuthComponent from "./components/Auth";
 
 // Toggle for development logging
 const DEV_MODE = false;
 
-export default function Home() {
+// Create a separate component for the main content
+function MainContent({ session }) {
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [jobId, setJobId] = useState(null);
@@ -157,9 +159,9 @@ export default function Home() {
       }
     };
 
-    // Add a small delay to avoid too many API calls while typing
-    const timeoutId = setTimeout(fetchMetadata, 500);
-    return () => clearTimeout(timeoutId);
+    if (url) {
+      fetchMetadata();
+    }
   }, [url]);
 
   // Clean up polling on unmount or when job completes
@@ -246,6 +248,12 @@ export default function Home() {
           // Check if it has subtitles
           if (outputData.en && outputData.en.url) {
             setTranscriptUrl(outputData.en.url);
+            
+            // Store the transcript if we have both URLs
+            if (url) {
+              console.log('Storing transcript...', { url, transcriptUrl: outputData.en.url });
+              await storeTranscript(url, outputData.en.url);
+            }
             
             // Fetch the VTT content
             try {
@@ -427,125 +435,214 @@ export default function Home() {
     }
   };
 
+  // Add storeTranscript function to MainContent component
+  const storeTranscript = async (youtubeUrl, transcriptUrl) => {
+    try {
+      // Check if we have a valid session
+      if (!session) {
+        console.error('No active session found');
+        return;
+      }
+
+      console.log('Storing transcript:', { youtubeUrl, transcriptUrl });
+      const response = await fetch('/api/store-transcript', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Authorization': `Bearer ${session.access_token}` // Add the access token
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          youtubeUrl,
+          transcriptUrl
+        })
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        console.error('Failed to store transcript:', data.error);
+      } else {
+        const data = await response.json();
+        console.log('Successfully stored transcript:', data);
+      }
+    } catch (error) {
+      console.error('Error storing transcript:', error);
+    }
+  };
+
+  // Update the handleJobCompletion function
+  const handleJobCompletion = async (jobId) => {
+    try {
+      console.log('handleJobCompletion called with jobId:', jobId);
+      // The actual storage is now handled in checkJobStatus
+    } catch (err) {
+      console.error("Error handling job completion:", err);
+    }
+  };
+
   return (
-    <div className="flex flex-col items-center min-h-screen p-8 gap-8 font-[family-name:var(--font-geist-sans)]">
-      <header className="w-full max-w-4xl mt-12 text-center">
-        <h1 className="text-3xl md:text-4xl font-bold mb-4">
-          YouTube Transcript Vending Machine
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Enter a YouTube URL to get the video's transcript
-        </p>
-      </header>
-
-      <main className="w-full max-w-4xl flex flex-col gap-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <input
-            type="text"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://www.youtube.com/watch?v=... or https://www.youtube.com/playlist?list=..."
-            className="flex-grow p-3 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
-            disabled={Object.values(loadingStates).some(Boolean) || Object.values(processingStates).some(Boolean)}
-          />
-          {isPlaylist && playlistVideos ? (
-            <button
-              onClick={() => fetchTranscript(url)}
-              disabled={Object.values(loadingStates).some(Boolean) || Object.values(processingStates).some(Boolean)}
-              className="py-3 px-6 rounded-md bg-foreground text-background hover:bg-[#383838] dark:hover:bg-[#ccc] transition-colors font-medium disabled:opacity-50"
-            >
-              {Object.values(loadingStates).some(Boolean) ? "Loading..." : 
-               Object.values(processingStates).some(Boolean) ? "Processing..." : 
-               `Get Transcripts (${playlistVideos.length} videos)`}
-            </button>
-          ) : (
-            <button
-              onClick={() => fetchTranscript(url)}
-              disabled={Object.values(loadingStates).some(Boolean) || Object.values(processingStates).some(Boolean) || !videoMetadata}
-              className="py-3 px-6 rounded-md bg-foreground text-background hover:bg-[#383838] dark:hover:bg-[#ccc] transition-colors font-medium disabled:opacity-50"
-            >
-              {Object.values(loadingStates).some(Boolean) ? "Loading..." : 
-               Object.values(processingStates).some(Boolean) ? "Processing..." : 
-               "Get Transcript"}
-            </button>
-          )}
+    <main className="min-h-screen bg-gray-900 text-white p-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-bold">YouTube Transcript Tool</h1>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+          >
+            Sign Out
+          </button>
         </div>
-
-        {isFetchingMetadata && (
-          <div className="p-4 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-            <p className="flex items-center">
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              {isPlaylist ? "Fetching playlist information..." : "Fetching video information..."}
+        <div className="flex flex-col items-center min-h-screen p-8 gap-8 font-[family-name:var(--font-geist-sans)]">
+          <header className="w-full max-w-4xl mt-12 text-center">
+            <h1 className="text-3xl md:text-4xl font-bold mb-4">
+              YouTube Transcript Vending Machine
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Enter a YouTube URL to get the video's transcript
             </p>
-          </div>
-        )}
+          </header>
 
-        <ErrorMessage message={error} />
-        
-        {!error && <JobStatus jobId={jobId} />}
-        
-        {playlistVideos && (
-          <div className="w-full space-y-4">
-            {playlistVideos.map((video) => (
-              <VideoMetadata 
-                key={video.id}
-                metadata={video}
-                videoUrl={`https://www.youtube.com/watch?v=${video.id}`}
-                onTranscriptRequest={() => fetchTranscript(`https://www.youtube.com/watch?v=${video.id}`)}
-                isLoading={loadingStates[video.id]}
-                isProcessing={processingStates[video.id]}
+          <main className="w-full max-w-4xl flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <input
+                type="text"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=... or https://www.youtube.com/playlist?list=..."
+                className="flex-grow p-3 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                disabled={Object.values(loadingStates).some(Boolean) || Object.values(processingStates).some(Boolean)}
               />
-            ))}
-          </div>
-        )}
-        
-        {!isPlaylist && videoMetadata && (
-          <VideoMetadata 
-            metadata={videoMetadata} 
-            videoUrl={url}
-            onTranscriptRequest={() => fetchTranscript(url)}
-            isLoading={loadingStates[isValidYouTubeUrl(url).videoId]}
-            isProcessing={processingStates[isValidYouTubeUrl(url).videoId]}
-          />
-        )}
-        
-        {transcript && (
-          <TranscriptDisplay
-            transcript={transcript}
-            transcriptUrl={transcriptUrl}
-            transcriptType={transcriptType}
-            duration={videoMetadata?.duration}
-            onDownloadRawTranscript={downloadRawTranscript}
-          />
-        )}
-        
-        {transcript && (
-          <AiSummary 
-            transcript={transcript} 
-            onSummaryGenerated={(summary) => setAiSummary(summary)}
-          />
-        )}
-      </main>
-      
-      <footer className="mt-auto py-6 text-center text-gray-500 text-sm">
-        Made with <span className="heart cursor-pointer select-none">❤️</span> by <a href="https://twitter.com/joshdance" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Josh Dance</a>
-      <style jsx>{`
-        @keyframes heartbeat {
-          0% { transform: scale(1); }
-          25% { transform: scale(1.1); }
-          50% { transform: scale(1); }
-          75% { transform: scale(1.1); }
-          100% { transform: scale(1); }
-        }
-        .heart:hover {
-          display: inline-block;
-          animation: heartbeat 1s ease-in-out infinite;
-        }
-      `}</style>
-      </footer>
-    </div>
+              {isPlaylist && playlistVideos ? (
+                <button
+                  onClick={() => fetchTranscript(url)}
+                  disabled={Object.values(loadingStates).some(Boolean) || Object.values(processingStates).some(Boolean)}
+                  className="py-3 px-6 rounded-md bg-foreground text-background hover:bg-[#383838] dark:hover:bg-[#ccc] transition-colors font-medium disabled:opacity-50"
+                >
+                  {Object.values(loadingStates).some(Boolean) ? "Loading..." : 
+                   Object.values(processingStates).some(Boolean) ? "Processing..." : 
+                   `Get Transcripts (${playlistVideos.length} videos)`}
+                </button>
+              ) : (
+                <button
+                  onClick={() => fetchTranscript(url)}
+                  disabled={Object.values(loadingStates).some(Boolean) || Object.values(processingStates).some(Boolean) || !videoMetadata}
+                  className="py-3 px-6 rounded-md bg-foreground text-background hover:bg-[#383838] dark:hover:bg-[#ccc] transition-colors font-medium disabled:opacity-50"
+                >
+                  {Object.values(loadingStates).some(Boolean) ? "Loading..." : 
+                   Object.values(processingStates).some(Boolean) ? "Processing..." : 
+                   "Get Transcript"}
+                </button>
+              )}
+            </div>
+
+            {isFetchingMetadata && (
+              <div className="p-4 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                <p className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {isPlaylist ? "Fetching playlist information..." : "Fetching video information..."}
+                </p>
+              </div>
+            )}
+
+            <ErrorMessage message={error} />
+            
+            {!error && <JobStatus jobId={jobId} onJobComplete={handleJobCompletion} />}
+            
+            {playlistVideos && (
+              <div className="w-full space-y-4">
+                {playlistVideos.map((video) => (
+                  <VideoMetadata 
+                    key={video.id}
+                    metadata={video}
+                    videoUrl={`https://www.youtube.com/watch?v=${video.id}`}
+                    onTranscriptRequest={() => fetchTranscript(`https://www.youtube.com/watch?v=${video.id}`)}
+                    isLoading={loadingStates[video.id]}
+                    isProcessing={processingStates[video.id]}
+                  />
+                ))}
+              </div>
+            )}
+            
+            {!isPlaylist && videoMetadata && (
+              <VideoMetadata 
+                metadata={videoMetadata} 
+                videoUrl={url}
+                onTranscriptRequest={() => fetchTranscript(url)}
+                isLoading={loadingStates[isValidYouTubeUrl(url).videoId]}
+                isProcessing={processingStates[isValidYouTubeUrl(url).videoId]}
+              />
+            )}
+            
+            {transcript && (
+              <TranscriptDisplay
+                transcript={transcript}
+                transcriptUrl={transcriptUrl}
+                transcriptType={transcriptType}
+                duration={videoMetadata?.duration}
+                onDownloadRawTranscript={downloadRawTranscript}
+              />
+            )}
+            
+            {transcript && (
+              <AiSummary 
+                transcript={transcript} 
+                onSummaryGenerated={(summary) => setAiSummary(summary)}
+              />
+            )}
+          </main>
+          
+          <footer className="mt-auto py-6 text-center text-gray-500 text-sm">
+            Made with <span className="heart cursor-pointer select-none">❤️</span> by <a href="https://twitter.com/joshdance" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Josh Dance</a>
+          <style jsx>{`
+            @keyframes heartbeat {
+              0% { transform: scale(1); }
+              25% { transform: scale(1.1); }
+              50% { transform: scale(1); }
+              75% { transform: scale(1.1); }
+              100% { transform: scale(1); }
+            }
+            .heart:hover {
+              display: inline-block;
+              animation: heartbeat 1s ease-in-out infinite;
+            }
+          `}</style>
+          </footer>
+        </div>
+      </div>
+    </main>
   );
+}
+
+// Main component that handles auth state
+export default function Home() {
+  const [session, setSession] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-4">
+        <h1 className="text-2xl font-bold text-center mb-8">YouTube Transcript Tool</h1>
+        <AuthComponent />
+      </div>
+    );
+  }
+
+  return <MainContent session={session} />;
 }
