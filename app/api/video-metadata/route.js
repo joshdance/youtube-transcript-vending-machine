@@ -3,8 +3,10 @@ import { NextResponse } from 'next/server';
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const videoUrl = searchParams.get('url');
+  console.log('Video metadata request for URL:', videoUrl);
   
   if (!videoUrl) {
+    console.log('Missing URL parameter');
     return NextResponse.json(
       { error: 'Missing YouTube video URL' },
       { status: 400 }
@@ -15,19 +17,28 @@ export async function GET(request) {
   let videoId;
   try {
     const url = new URL(videoUrl);
+    console.log('Parsed URL:', {
+      hostname: url.hostname,
+      pathname: url.pathname,
+      searchParams: Object.fromEntries(url.searchParams)
+    });
     
     if (url.hostname.includes('youtube.com')) {
-      // Regular youtube.com URL
+      // Regular youtube.com URL - get video ID from 'v' parameter
       videoId = url.searchParams.get('v');
+      console.log('Extracted video ID from youtube.com URL:', videoId);
     } else if (url.hostname.includes('youtu.be')) {
-      // Short youtu.be URL
-      videoId = url.pathname.slice(1);
+      // Short youtu.be URL - get video ID from pathname
+      videoId = url.pathname.slice(1).split('?')[0]; // Remove any query parameters
+      console.log('Extracted video ID from youtu.be URL:', videoId);
     }
     
     if (!videoId) {
+      console.error('Could not extract video ID');
       throw new Error('Could not extract video ID from URL');
     }
   } catch (error) {
+    console.error('Error parsing URL:', error);
     return NextResponse.json(
       { error: 'Invalid YouTube URL: ' + error.message },
       { status: 400 }
@@ -37,6 +48,7 @@ export async function GET(request) {
   // Get API key from environment variable
   const apiKey = process.env.YOUTUBE_DATA_v3_KEY;
   if (!apiKey) {
+    console.error('YouTube API key not configured');
     return NextResponse.json(
       { error: 'YouTube API key not configured' },
       { status: 500 }
@@ -45,17 +57,20 @@ export async function GET(request) {
   
   try {
     // Fetch video details
-    const videoResponse = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet,statistics,contentDetails&key=${apiKey}`
-    );
+    const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet,statistics,contentDetails&key=${apiKey}`;
+    console.log('Fetching from YouTube API:', apiUrl);
     
+    const videoResponse = await fetch(apiUrl);
     const videoData = await videoResponse.json();
+    console.log('YouTube API response:', videoData);
     
     if (!videoResponse.ok) {
+      console.error('YouTube API error:', videoData.error);
       throw new Error(`YouTube API error: ${videoData.error?.message || 'Unknown error'}`);
     }
     
     if (!videoData.items || videoData.items.length === 0) {
+      console.error('Video not found');
       return NextResponse.json(
         { error: 'Video not found' },
         { status: 404 }

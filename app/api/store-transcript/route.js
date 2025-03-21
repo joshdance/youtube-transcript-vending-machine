@@ -1,97 +1,88 @@
-import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request) {
   try {
-    console.log('Store transcript API called')
-    const cookieStore = cookies()
-    
-    // Log all cookies for debugging
-    const allCookies = cookieStore.getAll()
-    console.log('All cookies:', allCookies.map(c => c.name))
-    
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization')
-    console.log('Auth header:', authHeader ? 'Present' : 'Missing')
-    
-    const supabase = createServerClient(
+    // Get the cookie store and await it properly
+    const cookieStore = await cookies()
+    const authCookie = await cookieStore.get('sb-lrgtmzgdjzdrtyynttqk-auth-token')
+    const authToken = authCookie?.value
+
+    if (!authToken) {
+      console.log('Session check: Not found')
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Parse the auth token to get the access token
+    let accessToken
+    try {
+      const parsedToken = JSON.parse(authToken)
+      accessToken = parsedToken.access_token
+    } catch (e) {
+      console.error('Failed to parse auth token:', e)
+      return new Response(JSON.stringify({ error: 'Invalid auth token' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Initialize Supabase client with the access token
+    const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
-        cookies: {
-          get: (name) => {
-            const cookie = cookieStore.get(name)
-            console.log(`Getting cookie ${name}:`, cookie ? 'Found' : 'Not found')
-            return cookie?.value
-          },
-          set: (name, value, options) => {
-            console.log(`Setting cookie ${name}`)
-            cookieStore.set(name, value, options)
-          },
-          remove: (name, options) => {
-            console.log(`Removing cookie ${name}`)
-            cookieStore.set(name, '', options)
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
           },
         },
       }
     )
-    
-    // Verify authentication
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    console.log('Session check:', session ? 'Found' : 'Not found', sessionError ? `Error: ${sessionError.message}` : '')
-    
-    if (sessionError) {
-      console.error('Session error:', sessionError)
-      return NextResponse.json({ error: 'Authentication error' }, { status: 401 })
-    }
-    
-    if (!session) {
-      console.error('No session found')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
-    // Get request body
-    const body = await request.json()
-    console.log('Request body:', body)
-    const { youtubeUrl, transcriptUrl } = body
-    
+    const { youtubeUrl, transcriptUrl } = await request.json()
+
     if (!youtubeUrl || !transcriptUrl) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
     }
 
-    console.log('Attempting to insert with user_id:', session.user.id)
-    // Insert into transcripts table
     const { data, error } = await supabase
       .from('transcripts')
       .insert([
         {
           youtube_url: youtubeUrl,
           transcript_url: transcriptUrl,
-          user_id: session.user.id,
-          requested_at: new Date().toISOString()
-        }
+        },
       ])
       .select()
 
     if (error) {
       console.error('Supabase error:', error)
-      return NextResponse.json(
-        { error: 'Failed to store transcript' },
-        { status: 500 }
-      )
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      })
     }
 
-    console.log('Successfully stored transcript:', data)
-    return NextResponse.json({ data })
+    return new Response(JSON.stringify({ success: true, data }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
   } catch (error) {
-    console.error('Error in store-transcript route:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('Server error:', error)
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 }

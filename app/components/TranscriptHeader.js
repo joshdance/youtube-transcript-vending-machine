@@ -10,7 +10,6 @@ const TranscriptHeader = ({
   duration, 
   transcriptType, 
   copyContent, 
-  copyLabel,
   viewMode,
   onViewChange,
   gradientColors = {
@@ -28,14 +27,15 @@ const TranscriptHeader = ({
       {/* Header content */}
       <div className="flex-1 p-6 flex flex-col relative z-10">
         <div className="h-full flex flex-col gap-4">
-          {/* Title row */}
-          <div className="flex items-center">
+          {/* Title row with copy button */}
+          <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 truncate">
               {title}
             </h2>
+            <CopyButton content={copyContent} />
           </div>
           
-          {/* Bottom row with stats and controls */}
+          {/* Bottom row with stats and view toggle */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             {/* Stats */}
             <div className="flex flex-wrap gap-4 text-sm">
@@ -58,11 +58,8 @@ const TranscriptHeader = ({
               )}
             </div>
             
-            {/* Controls */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <CopyButton content={copyContent} label={copyLabel} />
-              <TranscriptViewToggle activeView={viewMode} onViewChange={onViewChange} />
-            </div>
+            {/* View toggle */}
+            <TranscriptViewToggle activeView={viewMode} onViewChange={onViewChange} />
           </div>
         </div>
       </div>
