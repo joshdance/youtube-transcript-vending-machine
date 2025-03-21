@@ -9,18 +9,65 @@
  */
 
 /**
- * Cleans the text by removing all timestamp markers and <c> tags
- * @param {string} text - The text to clean
- * @returns {string} - The cleaned text
+ * Decodes HTML entities in text
+ * @param {string} text - The text containing HTML entities
+ * @returns {string} - The text with decoded HTML entities
  */
-function cleanText(text) {
+function decodeHTMLEntities(text) {
+  if (!text) return '';
+  return text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+/**
+ * Safely processes HTML tags in text, only allowing specific styling tags
+ * @param {string} text - The text containing HTML tags
+ * @returns {string} - The text with safe HTML tags
+ */
+function processStylingTags(text) {
   if (!text) return '';
   
-  return text
+  // List of allowed HTML tags
+  const allowedTags = ['b', 'i', 'u', 'em', 'strong'];
+  
+  // First decode HTML entities
+  let processedText = decodeHTMLEntities(text);
+  
+  // Remove any tags that aren't in our allowed list
+  processedText = processedText.replace(/<\/?([a-z][a-z0-9]*)/gi, (match, tag) => {
+    if (allowedTags.includes(tag.toLowerCase())) {
+      return match;
+    }
+    return '';
+  });
+  
+  return processedText;
+}
+
+/**
+ * Cleans the text by removing all timestamp markers and <c> tags
+ * @param {string} text - The text to clean
+ * @param {boolean} preserveStyling - Whether to preserve styling tags
+ * @returns {string} - The cleaned text
+ */
+function cleanText(text, preserveStyling = false) {
+  if (!text) return '';
+  
+  let cleaned = text
     .replace(/<\d\d:\d\d:\d\d\.\d+>/g, '') // Remove timestamp markers like <00:00:00.000>
     .replace(/<\/?c>/g, '')                // Remove <c> and </c> tags
     .replace(/\s+/g, ' ')                  // Normalize whitespace
     .trim();
+
+  if (!preserveStyling) {
+    cleaned = cleaned.replace(/<\/?[a-z][a-z0-9]*>/gi, ''); // Remove all HTML tags
+  }
+  
+  return cleaned;
 }
 
 /**
@@ -41,6 +88,9 @@ function processTranscriptAlgo1(transcript) {
     if (!entry.text || entry.text.trim() === '') {
       return false;
     }
+
+    // Process styling tags safely
+    entry.text = processStylingTags(entry.text);
 
     // Check if the text contains embedded timestamps like <00:00:00.199>
     const hasEmbeddedTimestamps = /<\d\d:\d\d:\d\d\.\d+>/.test(entry.text);
@@ -114,7 +164,8 @@ function processTranscriptAlgo1(transcript) {
     });
     
     // Join all segments and clean the text by removing timestamp markers and <c> tags
-    modifiedEntry.text = cleanText(segments.join(''));
+    // but preserve styling tags
+    modifiedEntry.text = cleanText(segments.join(''), true);
     
     return modifiedEntry;
   }).filter(entry => entry.text.trim() !== ''); // Remove entries with empty text
@@ -123,4 +174,4 @@ function processTranscriptAlgo1(transcript) {
   return processedTranscript;
 }
 
-export { processTranscriptAlgo1, cleanText }; 
+export { processTranscriptAlgo1, cleanText, processStylingTags }; 

@@ -28,7 +28,7 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
   const ScrollButton = ({ onClick, isTop }) => (
     <button
       onClick={onClick}
-      className="absolute right-4 z-10 p-2 rounded-full bg-white/80 dark:bg-gray-800/80 shadow-md hover:bg-white dark:hover:bg-gray-800 transition-colors border border-gray-200 dark:border-gray-700"
+      className={`absolute right-4 z-10 p-2 rounded-full bg-white/80 dark:bg-gray-800/80 shadow-md hover:bg-white dark:hover:bg-gray-800 transition-colors border border-gray-200 dark:border-gray-700 ${isTop ? 'top-4' : 'bottom-4'}`}
       aria-label={isTop ? "Scroll to bottom" : "Scroll to top"}
     >
       <svg
@@ -47,7 +47,7 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
       </svg>
     </button>
   );
-  
+
   if (!transcript) return null;
   
   // Function to handle view mode changes
@@ -120,30 +120,14 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
         />
         
         <div className="border-t border-gray-200 dark:border-gray-700 relative">
-          <ScrollButton onClick={scrollToBottom} isTop={true} />
           <div ref={transcriptContentRef} className="max-h-[60vh] overflow-y-auto">
-            <div className="p-6 space-y-4">
-              <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                <p className="font-medium mb-2">Transcript URL:</p>
-                <a 
-                  href={transcriptUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="break-all text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  {transcriptUrl}
-                </a>
-              </div>
-              
-              <div className="flex justify-center mb-4">
-                <DownloadButton onDownload={onDownloadRawTranscript} />
-              </div>
-              
-              <pre className="whitespace-pre-wrap font-[family-name:var(--font-geist-mono)] text-sm p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                {rawContent}
+            <div className="p-4">
+              <pre className="whitespace-pre-wrap font-mono text-sm text-gray-700 dark:text-gray-300">
+                {getRawContent()}
               </pre>
             </div>
           </div>
+          <ScrollButton onClick={scrollToBottom} isTop={true} />
           <ScrollButton onClick={scrollToTop} isTop={false} />
         </div>
       </div>
@@ -182,7 +166,6 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
         
         {/* Transcript content */}
         <div className="border-t border-gray-200 dark:border-gray-700 relative">
-          <ScrollButton onClick={scrollToBottom} isTop={true} />
           <div ref={transcriptContentRef} className="max-h-[60vh] overflow-y-auto">
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {validProcessedTranscript.map((cue, index) => (
@@ -193,11 +176,15 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
                     </svg>
                     <span>{cue.startTime} → {cue.endTime}</span>
                   </div>
-                  <p className="text-gray-700 dark:text-gray-300">{cue.text}</p>
+                  <p 
+                    className="text-gray-700 dark:text-gray-300"
+                    dangerouslySetInnerHTML={{ __html: cue.text }}
+                  />
                 </div>
               ))}
             </div>
           </div>
+          <ScrollButton onClick={scrollToBottom} isTop={true} />
           <ScrollButton onClick={scrollToTop} isTop={false} />
         </div>
       </div>
@@ -216,8 +203,8 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
       ? processedTranscript.filter(cue => cue && cue.text && cue.text.trim() !== '')
       : transcript;
     
-    // Extract just the text content without timestamps
-    const textContent = validProcessedTranscript.map(cue => cue.text).join(' ');
+    // Extract just the text content without timestamps and styling tags
+    const textContent = validProcessedTranscript.map(cue => cleanText(cue.text, false)).join(' ');
     
     return (
       <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
@@ -241,12 +228,12 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
         
         {/* Text content */}
         <div className="border-t border-gray-200 dark:border-gray-700 relative">
-          <ScrollButton onClick={scrollToBottom} isTop={true} />
           <div ref={transcriptContentRef} className="max-h-[60vh] overflow-y-auto">
             <div className="p-6 leading-relaxed text-gray-700 dark:text-gray-300">
               {textContent}
             </div>
           </div>
+          <ScrollButton onClick={scrollToBottom} isTop={true} />
           <ScrollButton onClick={scrollToTop} isTop={false} />
         </div>
       </div>
@@ -276,7 +263,6 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
       />
       
       <div className="border-t border-gray-200 dark:border-gray-700 relative">
-        <ScrollButton onClick={scrollToBottom} isTop={true} />
         <div ref={transcriptContentRef} className="max-h-[60vh] overflow-y-auto">
           {transcriptUrl && (
             <div className="p-6">
@@ -300,6 +286,7 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
             </pre>
           </div>
         </div>
+        <ScrollButton onClick={scrollToBottom} isTop={true} />
         <ScrollButton onClick={scrollToTop} isTop={false} />
       </div>
     </div>
