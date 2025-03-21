@@ -52,6 +52,7 @@ export async function GET(request) {
   }
 }
 
+//todo move this into a separate file
 /**
  * Parse VTT format into a more usable structure and detect transcript type
  */
