@@ -119,7 +119,7 @@ function MainContent({ session }) {
     <main className="min-h-screen">
       <div className="max-w-4xl mx-auto">
         <div className="flex flex-col items-center min-h-screen gap-6 font-[family-name:var(--font-geist-sans)]">
-          <Header />
+          <Header session={session} />
           <main className="w-full max-w-4xl flex flex-col gap-6 px-4">
             <Hero />
             <div className="flex flex-col sm:flex-row gap-4">
