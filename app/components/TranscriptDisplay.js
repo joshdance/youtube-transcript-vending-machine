@@ -176,9 +176,10 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
                     </svg>
                     <span>{cue.startTime} → {cue.endTime}</span>
                   </div>
-                  <p className="text-gray-700 dark:text-gray-300">
-                    {cleanText(cue.text, false)}
-                  </p>
+                  <p 
+                    className="text-gray-700 dark:text-gray-300"
+                    dangerouslySetInnerHTML={{ __html: cleanText(cue.text, true) }}
+                  />
                 </div>
               ))}
             </div>
@@ -202,8 +203,10 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
       ? processedTranscript.filter(cue => cue && cue.text && cue.text.trim() !== '')
       : transcript;
     
-    // Extract just the text content without timestamps and styling tags
-    const textContent = validProcessedTranscript.map(cue => cleanText(cue.text, false)).join(' ');
+    // Generate content for copy
+    const textContent = validProcessedTranscript
+      .map(cue => cleanText(cue.text, false))
+      .join('\n');
     
     return (
       <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
@@ -219,17 +222,22 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
           onViewChange={handleViewChange}
           gradientColors={{
             from: 'green-50',
-            to: 'blue-50',
+            to: 'emerald-50',
             darkFrom: 'green-950/30',
-            darkTo: 'blue-950/30'
+            darkTo: 'emerald-950/30'
           }}
         />
         
-        {/* Text content */}
         <div className="border-t border-gray-200 dark:border-gray-700 relative">
           <div ref={transcriptContentRef} className="max-h-[60vh] overflow-y-auto">
-            <div className="p-6 leading-relaxed text-gray-700 dark:text-gray-300">
-              {textContent}
+            <div className="p-4">
+              <div 
+                className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap"
+                dangerouslySetInnerHTML={{ __html: validProcessedTranscript
+                  .map(cue => cleanText(cue.text, true))
+                  .join('\n')
+                }}
+              />
             </div>
           </div>
           <ScrollButton onClick={scrollToBottom} isTop={true} />

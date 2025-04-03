@@ -6,11 +6,11 @@ import ErrorMessage from "../components/ErrorMessage";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import AuthProvider from "../components/AuthProvider";
-import { processTranscriptAlgo1, cleanText } from "../utils/transcriptAlgo1";
+import { processTranscriptAlgo1, cleanText, processStylingTags } from "../utils/transcriptAlgo1";
 import DownloadButton from "../components/DownloadButton";
 
 // Toggle for development logging
-const DEV_MODE = false;
+const DEV_MODE = true;  // Enable debug logging temporarily
 
 // Create a separate component for the main content
 function MainContent({ session }) {
@@ -117,8 +117,12 @@ function MainContent({ session }) {
           .trim();
           
         if (cleanedLine) {
+          // Process the line to ensure HTML styling tags are preserved
+          const processedLine = processStylingTags(cleanedLine);
+          debugLog('Processing line:', { original: cleanedLine, processed: processedLine });
+          
           // Add the text wrapped in <c> tags
-          currentEntry.text += `<c>${cleanedLine}</c>`;
+          currentEntry.text += `<c>${processedLine}</c>`;
         }
       }
     }
@@ -129,9 +133,13 @@ function MainContent({ session }) {
       currentEntry.text += `<${currentEntry.endTime}>`;
       transcriptData.push(currentEntry);
     }
+
+    debugLog('Processed transcript data:', transcriptData);
     
     // Process the transcript using the same algorithm as the main page
     const processedTranscript = processTranscriptAlgo1(transcriptData);
+    
+    debugLog('Final processed transcript:', processedTranscript);
     
     // If the processed transcript is empty, return the original transcript data
     if (!processedTranscript || processedTranscript.length === 0) {
