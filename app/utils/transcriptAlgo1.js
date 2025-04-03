@@ -57,12 +57,14 @@ function processStylingTags(text) {
 function cleanText(text, preserveStyling = false) {
   if (!text) return '';
   
+  // Always remove timestamp markers and <c> tags regardless of preserveStyling
   let cleaned = text
     .replace(/<\d\d:\d\d:\d\d\.\d+>/g, '') // Remove timestamp markers like <00:00:00.000>
     .replace(/<\/?c>/g, '')                // Remove <c> and </c> tags
     .replace(/\s+/g, ' ')                  // Normalize whitespace
     .trim();
 
+  // Only remove styling tags if preserveStyling is false
   if (!preserveStyling) {
     cleaned = cleaned.replace(/<\/?[a-z][a-z0-9]*>/gi, ''); // Remove all HTML tags
   }
@@ -88,9 +90,6 @@ function processTranscriptAlgo1(transcript) {
     if (!entry.text || entry.text.trim() === '') {
       return false;
     }
-
-    // Process styling tags safely
-    entry.text = processStylingTags(entry.text);
 
     // Check if the text contains embedded timestamps like <00:00:00.199>
     const hasEmbeddedTimestamps = /<\d\d:\d\d:\d\d\.\d+>/.test(entry.text);
@@ -163,9 +162,13 @@ function processTranscriptAlgo1(transcript) {
       segments.push(segment.fullMatch);
     });
     
-    // Join all segments and clean the text by removing timestamp markers and <c> tags
-    // but preserve styling tags
-    modifiedEntry.text = cleanText(segments.join(''), true);
+    // First clean the text by removing timestamp markers and <c> tags
+    let cleanedText = cleanText(segments.join(''), false);
+    
+    // Then process styling tags if needed
+    cleanedText = processStylingTags(cleanedText);
+    
+    modifiedEntry.text = cleanedText;
     
     return modifiedEntry;
   }).filter(entry => entry.text.trim() !== ''); // Remove entries with empty text

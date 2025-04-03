@@ -83,7 +83,7 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
       ? processedTranscript.filter(cue => cue && cue.text && cue.text.trim() !== '')
       : transcript;
     
-    const textContent = validTranscript.map(cue => cue.text).join(' ');
+    const textContent = validTranscript.map(cue => cleanText(cue.text, false)).join(' ');
     return textContent.trim().split(/\s+/).length;
   };
 
@@ -147,7 +147,7 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
     
     // Generate content for copy
     const timestampContent = validProcessedTranscript.map(cue => 
-      `[${cue.startTime} → ${cue.endTime}] ${cue.text}`
+      `[${cue.startTime} → ${cue.endTime}] ${cleanText(cue.text, false)}`
     ).join('\n');
     
     return (
@@ -176,10 +176,9 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
                     </svg>
                     <span>{cue.startTime} → {cue.endTime}</span>
                   </div>
-                  <p 
-                    className="text-gray-700 dark:text-gray-300"
-                    dangerouslySetInnerHTML={{ __html: cue.text }}
-                  />
+                  <p className="text-gray-700 dark:text-gray-300">
+                    {cleanText(cue.text, false)}
+                  </p>
                 </div>
               ))}
             </div>
@@ -251,7 +250,7 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
         duration={duration}
         transcriptType={transcriptType}
         copyContent={defaultContent}
-        copyLabel="Data"
+        copyLabel="Raw"
         viewMode={viewMode}
         onViewChange={handleViewChange}
         gradientColors={{
@@ -264,24 +263,8 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
       
       <div className="border-t border-gray-200 dark:border-gray-700 relative">
         <div ref={transcriptContentRef} className="max-h-[60vh] overflow-y-auto">
-          {transcriptUrl && (
-            <div className="p-6">
-              <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                <p className="font-medium mb-2">Transcript URL:</p>
-                <a 
-                  href={transcriptUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="break-all text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  {transcriptUrl}
-                </a>
-              </div>
-            </div>
-          )}
-          
-          <div className="p-6">
-            <pre className="whitespace-pre-wrap font-[family-name:var(--font-geist-mono)] text-sm p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+          <div className="p-4">
+            <pre className="whitespace-pre-wrap font-mono text-sm text-gray-700 dark:text-gray-300">
               {defaultContent}
             </pre>
           </div>
