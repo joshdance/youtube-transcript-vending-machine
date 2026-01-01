@@ -3,7 +3,7 @@ import TranscriptHeader from './TranscriptHeader';
 import { processTranscriptAlgo1, cleanText } from '../utils/transcriptAlgo1';
 import DownloadButton from './DownloadButton';
 
-const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration, onDownloadRawTranscript }) => {
+const TranscriptDisplay = ({ transcript, transcriptType, duration, onDownload }) => {
   // Default to timestamps view
   const [viewMode, setViewMode] = useState('timestamps');
   const transcriptContentRef = useRef(null);
@@ -96,7 +96,7 @@ const TranscriptDisplay = ({ transcript, transcriptUrl, transcriptType, duration
   };
   
   // Raw view mode - shows the raw transcript data
-  if (viewMode === 'raw' && transcriptUrl) {
+  if (viewMode === 'raw') {
     const rawContent = getRawContent();
     
     return (

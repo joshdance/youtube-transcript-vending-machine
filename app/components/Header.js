@@ -24,16 +24,6 @@ const Header = ({ session }) => {
             >
               Home
             </Link>
-            <Link 
-              href="/sievetranscripturl" 
-              className={`px-3 py-1 rounded-md transition-colors ${
-                pathname === '/sievetranscripturl' 
-                  ? 'bg-gray-200 dark:bg-gray-700 font-medium' 
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-            >
-              Sieve Transcript URL
-            </Link>
           </nav>
         </div>
         {session && (
@@ -49,4 +39,4 @@ const Header = ({ session }) => {
   );
 };
 
-export default Header; 
+export default Header;

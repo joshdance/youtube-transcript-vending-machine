@@ -47,10 +47,28 @@ export async function POST(request) {
       }
     )
 
-    const { youtubeUrl, transcriptUrl } = await request.json()
+    const { youtubeUrl, transcriptData, transcriptUrl } = await request.json()
 
-    if (!youtubeUrl || !transcriptUrl) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+    if (!youtubeUrl) {
+      return new Response(JSON.stringify({ error: 'Missing YouTube URL' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Support both new format (transcriptData as JSON) and legacy format (transcriptUrl)
+    const insertData = {
+      youtube_url: youtubeUrl,
+    }
+
+    if (transcriptData) {
+      // New format: store transcript content as JSON
+      insertData.transcript_content = transcriptData
+    } else if (transcriptUrl) {
+      // Legacy format: store URL
+      insertData.transcript_url = transcriptUrl
+    } else {
+      return new Response(JSON.stringify({ error: 'Missing transcript data' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       })
@@ -58,12 +76,7 @@ export async function POST(request) {
 
     const { data, error } = await supabase
       .from('transcripts')
-      .insert([
-        {
-          youtube_url: youtubeUrl,
-          transcript_url: transcriptUrl,
-        },
-      ])
+      .insert([insertData])
       .select()
 
     if (error) {
