@@ -72,6 +72,9 @@ function MainContent({ session }) {
       targetUrl: videoUrl || url,
       url,
       session,
+      chunkSize: 100, // Adjust this value: smaller = more granular segments (50-10000)
+      // mode: 'auto', // Optional: 'native' | 'auto' | 'generate'
+      // language: 'en', // Optional: language code
       states: {
         setError,
         setTranscript,

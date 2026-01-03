@@ -10,6 +10,9 @@ import { debugLog } from './debug';
  * @param {string} params.targetUrl - The YouTube video URL
  * @param {string} params.url - The current URL in the input field
  * @param {Object} params.session - The user's session object
+ * @param {string} [params.language='en'] - Language code for the transcript
+ * @param {number} [params.chunkSize] - Maximum characters per chunk (50-10000). Smaller = more granular segments
+ * @param {string} [params.mode] - Transcript mode: 'native' | 'auto' | 'generate'
  * @param {Object} params.states - State management object
  * @param {Function} params.states.setError - Function to set error state
  * @param {Function} params.states.setTranscript - Function to set transcript state
@@ -21,6 +24,9 @@ export async function fetchTranscript({
   targetUrl,
   url,
   session,
+  language,
+  chunkSize,
+  mode,
   states: {
     setError,
     setTranscript,
@@ -51,13 +57,19 @@ export async function fetchTranscript({
 
   try {
     debugLog("Fetching transcript for URL:", targetUrl);
+    debugLog("Transcript options:", { language, chunkSize, mode });
     
     const response = await fetch("/api/transcripts", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ url: targetUrl }),
+      body: JSON.stringify({ 
+        url: targetUrl,
+        ...(language && { language }),
+        ...(chunkSize !== undefined && chunkSize !== null && { chunkSize }),
+        ...(mode && { mode })
+      }),
     });
 
     const data = await response.json();
