@@ -1,23 +1,42 @@
 # YouTube Transcript Vending Machine
 
-This application allows you to extract transcripts from YouTube videos using the Sieve API.
+This application allows you to extract transcripts from YouTube videos using multiple provider options (Supadata, YouTube Transcript API, or Oxylabs).
 
 ## Features
 
 - Simple interface to input YouTube video URLs
-- Extract video transcripts using Sieve API
+- Extract video transcripts using configurable providers
 - View metadata and transcript content
+- Adjustable segment granularity
+- Support for multiple languages
 
 ## Getting Started
 
-First, you need to obtain a Sieve API key:
+First, configure your transcript provider in `.env.local`:
 
-1. Sign up for a Sieve account at [https://www.sievedata.com/](https://www.sievedata.com/)
-2. Generate an API key from your dashboard
-3. Add your API key to the `.env.local` file:
+### Using Supadata (Recommended)
+
+1. Sign up for a Supadata account at [https://supadata.ai](https://supadata.ai)
+2. Get your API key from the dashboard
+3. Add to `.env.local`:
 
 ```
-SIEVE_API_KEY=your_sieve_api_key_here
+TRANSCRIPT_PROVIDER=supadata
+SUPADATA_API_KEY=your_supadata_api_key_here
+```
+
+### Using YouTube Transcript API (No API key required)
+
+```
+TRANSCRIPT_PROVIDER=youtube-transcript
+```
+
+### Using Oxylabs
+
+```
+TRANSCRIPT_PROVIDER=oxylabs
+OXYLABS_USERNAME=your_username
+OXYLABS_PASSWORD=your_password
 ```
 
 Then, install the dependencies and run the development server:
@@ -40,7 +59,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 - Next.js
 - React
 - Tailwind CSS
-- Sieve API
+- Supadata API (or other configured provider)
 
 ## License
 
@@ -51,6 +70,6 @@ This project is open source and available under the [MIT License](LICENSE).
 To learn more about the technologies used in this project:
 
 - [Next.js Documentation](https://nextjs.org/docs)
-- [Sieve API Documentation](https://www.sievedata.com/dashboard/docs)
+- [Supadata Documentation](https://docs.supadata.ai)
 - [React Documentation](https://reactjs.org/docs/getting-started.html)
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
