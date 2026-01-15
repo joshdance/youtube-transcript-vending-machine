@@ -110,7 +110,7 @@ const AiSummary = ({ transcript, onSummaryGenerated }) => {
           {isLoading ? (
             <div className="flex flex-col items-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
-              <p>Generating summary with Google Gemini AI...</p>
+              <p>Generating summary...</p>
               <p className="text-xs mt-1">(This may take a moment)</p>
             </div>
           ) : (

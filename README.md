@@ -54,6 +54,46 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 2. Click "Get Transcript"
 3. The transcript will be displayed below the input field
 
+## AI Summary Provider (Vercel AI Gateway)
+
+The summary endpoint (`/api/ai-summary`) can use **Vercel AI Gateway** (recommended) or fall back to **Google Gemini**.
+
+### AI Gateway env
+
+```
+AI_SUMMARY_BACKEND=gateway
+AI_GATEWAY_API_KEY=your_vercel_ai_gateway_key
+# Optional (defaults shown)
+AI_GATEWAY_BASE_URL=https://gateway.ai.vercel.com/v1
+AI_SUMMARY_MODEL=openai:gpt-4o-mini
+```
+
+### Gemini env (fallback)
+
+```
+AI_SUMMARY_BACKEND=gemini
+GOOGLE_GEMINI_API_KEY=your_gemini_key
+# Optional (defaults shown)
+GOOGLE_GEMINI_MODEL=gemini-2.0-flash
+```
+
+## Cost Estimation
+
+`POST /api/cost-estimate` estimates the cost to fetch a transcript + summarize it.
+
+- Provide `transcript` (preferred) to estimate from actual transcript size, or `durationSeconds` as a fallback.
+- Configure pricing using env vars (USD per 1M tokens):
+
+```
+AI_SUMMARY_INPUT_USD_PER_1M=0
+AI_SUMMARY_OUTPUT_USD_PER_1M=0
+AI_SUMMARY_ESTIMATED_COMPLETION_TOKENS=800
+
+# If using paid transcript providers:
+OXYLABS_COST_USD_PER_REQUEST=0
+SUPADATA_COST_USD_PER_REQUEST=0
+```
+
 ## Technologies Used
 
 - Next.js

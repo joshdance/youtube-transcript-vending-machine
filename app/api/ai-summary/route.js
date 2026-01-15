@@ -5,6 +5,72 @@ import DEFAULT_PROMPT from "../../utils/aiSummaryPrompt";
 // Toggle for development logging
 const DEV_MODE = false;
 
+function getSummaryBackend() {
+  // Prefer AI Gateway when configured, otherwise fall back to Gemini.
+  return (
+    process.env.AI_SUMMARY_BACKEND ||
+    (process.env.AI_GATEWAY_API_KEY ? "gateway" : "gemini")
+  );
+}
+
+async function generateSummaryViaGateway(prompt) {
+  const apiKey = process.env.AI_GATEWAY_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing AI_GATEWAY_API_KEY in server configuration");
+  }
+
+  // OpenAI-compatible endpoint
+  const baseUrl = process.env.AI_GATEWAY_BASE_URL || "https://gateway.ai.vercel.com/v1";
+  const model = process.env.AI_SUMMARY_MODEL || "openai:gpt-4o-mini";
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `AI Gateway error (${response.status}): ${text || response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+  const content = data?.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("AI Gateway returned an empty response");
+  }
+
+  return content;
+}
+
+async function generateSummaryViaGemini(prompt) {
+  const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Missing GOOGLE_GEMINI_API_KEY in server configuration");
+  }
+
+  // Initialize the Google Generative AI client
+  const genAI = new GoogleGenerativeAI(apiKey);
+
+  // Use the Gemini flash model
+  const model = genAI.getGenerativeModel({
+    model: process.env.GOOGLE_GEMINI_MODEL || "gemini-2.0-flash",
+  });
+
+  const result = await model.generateContent(prompt);
+  return result.response.text();
+}
+
 export async function POST(request) {
   try {
     const { transcript, customPrompt } = await request.json();
@@ -12,29 +78,11 @@ export async function POST(request) {
     if (!transcript) {
       return Response.json({ error: "Transcript data is required" }, { status: 400 });
     }
-    
-    // Get API key from environment variable
-    const GOOGLE_GEMINI_API_KEY = process.env.GOOGLE_GEMINI_API_KEY;
-    
-    if (!GOOGLE_GEMINI_API_KEY) {
-      return Response.json(
-        { error: "Missing Google Gemini API key in server configuration" }, 
-        { status: 500 }
-      );
-    }
 
     // Log in dev mode
     if (DEV_MODE) {
       console.log("Generating AI summary for transcript");
     }
-
-    // Initialize the Google Generative AI client
-    const genAI = new GoogleGenerativeAI(GOOGLE_GEMINI_API_KEY);
-    
-    // Use the Gemini flash model
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash"
-    });
 
     // Create the prompt for summary generation
     const promptPrefix = `${customPrompt || DEFAULT_PROMPT}
@@ -74,16 +122,21 @@ Here is the transcript:
       console.log("Using prompt:", prompt.substring(0, 100) + "...");
     }
 
+    const backend = getSummaryBackend();
+    const provider = backend === "gateway" ? "vercel-ai-gateway" : "google-gemini";
+
     // Generate the summary
-    const result = await model.generateContent(prompt);
-    const summary = result.response.text();
+    const summary =
+      backend === "gateway"
+        ? await generateSummaryViaGateway(prompt)
+        : await generateSummaryViaGemini(prompt);
     
     // Log in dev mode
     if (DEV_MODE) {
       console.log("AI summary generated successfully");
     }
 
-    return Response.json({ success: true, summary });
+    return Response.json({ success: true, summary, provider });
   } catch (error) {
     console.error('Error in AI summary API:', error);
     return Response.json(
