@@ -39,6 +39,19 @@ OXYLABS_USERNAME=your_username
 OXYLABS_PASSWORD=your_password
 ```
 
+## Transcript Storage / Cache (Supabase)
+
+The transcript endpoint (`/api/transcripts`) will **check Supabase first** and return a cached transcript (if present) before calling the configured transcript provider. On a cache miss, it will fetch via the provider and then **store the transcript in Supabase** for future requests.
+
+To enable server-side caching (recommended), set:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+If you don’t set `SUPABASE_SERVICE_ROLE_KEY`, the server will fall back to `NEXT_PUBLIC_SUPABASE_ANON_KEY`, which may not work if your `transcripts` table has RLS enabled for reads/writes.
+
 Then, install the dependencies and run the development server:
 
 ```bash

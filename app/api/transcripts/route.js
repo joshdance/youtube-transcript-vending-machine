@@ -13,6 +13,36 @@
 
 import { getProvider } from '@/app/lib/transcript-providers';
 import { isValidYouTubeUrl } from '@/app/utils/youtube';
+import { createClient } from '@supabase/supabase-js';
+
+function getCanonicalYouTubeUrl(videoId) {
+  return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
+function getSupabaseCacheClient() {
+  const supabaseUrl =
+    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl) return null;
+
+  // Prefer service role for server-side caching (bypasses RLS).
+  if (serviceRoleKey) {
+    return createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+
+  // Fall back to anon key (may fail if RLS blocks reads/writes).
+  if (anonKey) {
+    return createClient(supabaseUrl, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+
+  return null;
+}
 
 export async function POST(request) {
   console.log('[API /transcripts] POST request received');
@@ -52,6 +82,42 @@ export async function POST(request) {
     }
 
     console.log('[API /transcripts] Video ID:', validation.videoId);
+
+    // Try Supabase cache first to avoid paid provider calls
+    const canonicalUrl = getCanonicalYouTubeUrl(validation.videoId);
+    const supabase = getSupabaseCacheClient();
+    if (supabase) {
+      try {
+        const urlsToCheck = Array.from(new Set([url, canonicalUrl]));
+        console.log('[API /transcripts] Checking Supabase cache for URLs:', urlsToCheck);
+
+        const { data: cachedRows, error: cacheError } = await supabase
+          .from('transcripts')
+          .select('transcript_content, youtube_url')
+          .in('youtube_url', urlsToCheck)
+          .not('transcript_content', 'is', null)
+          .limit(1);
+
+        if (cacheError) {
+          console.warn('[API /transcripts] Cache lookup error (continuing):', cacheError.message);
+        } else if (cachedRows && cachedRows.length > 0 && cachedRows[0]?.transcript_content) {
+          console.log('[API /transcripts] Cache hit from:', cachedRows[0].youtube_url);
+          return Response.json({
+            segments: cachedRows[0].transcript_content,
+            language: language || 'en',
+            transcriptType: 'cached',
+            provider: 'supabase-cache',
+            cacheHit: true,
+          });
+        } else {
+          console.log('[API /transcripts] Cache miss');
+        }
+      } catch (err) {
+        console.warn('[API /transcripts] Cache lookup exception (continuing):', err?.message || err);
+      }
+    } else {
+      console.log('[API /transcripts] Supabase cache not configured (missing env)');
+    }
 
     // Get the configured provider
     console.log('[API /transcripts] Getting provider...');
@@ -128,6 +194,32 @@ export async function POST(request) {
 
     // Return successful result
     console.log('[API /transcripts] Success! Returning', result.segments?.length, 'segments');
+
+    // Best-effort: store transcript in Supabase for future cache hits
+    if (result?.segments && Array.isArray(result.segments) && result.segments.length > 0) {
+      const supabaseForWrite = getSupabaseCacheClient();
+      if (supabaseForWrite) {
+        try {
+          const insertData = {
+            youtube_url: canonicalUrl,
+            transcript_content: result.segments,
+          };
+
+          const { error: insertError } = await supabaseForWrite
+            .from('transcripts')
+            .insert([insertData]);
+
+          if (insertError) {
+            console.warn('[API /transcripts] Failed to cache transcript (continuing):', insertError.message);
+          } else {
+            console.log('[API /transcripts] Cached transcript in Supabase for:', canonicalUrl);
+          }
+        } catch (err) {
+          console.warn('[API /transcripts] Cache write exception (continuing):', err?.message || err);
+        }
+      }
+    }
+
     return Response.json(result);
 
   } catch (error) {
