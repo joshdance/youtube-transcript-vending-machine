@@ -9,7 +9,7 @@ const Hero = () => {
         YouTube Transcript Vending Machine
       </h1>
       <p className="text-gray-600 dark:text-gray-400">
-        Enter a YouTube URL to get the video's transcript
+        Enter a YouTube URL to get the video&apos;s transcript
       </p>
     </header>
   );

@@ -114,7 +114,7 @@ const AiSummary = ({ transcript, onSummaryGenerated }) => {
               <p className="text-xs mt-1">(This may take a moment)</p>
             </div>
           ) : (
-            <p>Click "Generate Summary" to create an AI-powered summary of the transcript</p>
+            <p>Click &quot;Generate Summary&quot; to create an AI-powered summary of the transcript</p>
           )}
         </div>
       )}
