@@ -56,6 +56,10 @@ export async function fetchTranscript({
   setTranscriptType(null);
 
   try {
+    if (!session?.access_token) {
+      throw new Error("Please sign in to get transcripts (1 credit each).");
+    }
+
     debugLog("Fetching transcript for URL:", targetUrl);
     debugLog("Transcript options:", { language, chunkSize, mode });
     
@@ -63,6 +67,7 @@ export async function fetchTranscript({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({ 
         url: targetUrl,

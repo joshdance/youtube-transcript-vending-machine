@@ -52,6 +52,35 @@ SUPABASE_SERVICE_ROLE_KEY=...
 
 If you don’t set `SUPABASE_SERVICE_ROLE_KEY`, the server will fall back to `NEXT_PUBLIC_SUPABASE_ANON_KEY`, which may not work if your `transcripts` table has RLS enabled for reads/writes.
 
+## Credits (1 credit per transcript request)
+
+Transcript fetching requires a signed-in user. Each successful transcript request records **1 credit** in Supabase (even if served from cache) so you can track usage per user.
+
+### Required Supabase table
+
+Create a `credits_usage` table (server writes use `SUPABASE_SERVICE_ROLE_KEY`):
+
+```sql
+create table if not exists public.credits_usage (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  action text not null,
+  youtube_url text,
+  video_id text,
+  cache_hit boolean default false,
+  provider text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists credits_usage_user_id_created_at_idx
+  on public.credits_usage (user_id, created_at desc);
+```
+
+### API
+
+- `POST /api/transcripts`: requires auth; records 1 credit on success
+- `GET /api/credits`: returns `{ creditsUsed }` for the signed-in user
+
 Then, install the dependencies and run the development server:
 
 ```bash

@@ -14,9 +14,30 @@
 import { getProvider } from '@/app/lib/transcript-providers';
 import { isValidYouTubeUrl } from '@/app/utils/youtube';
 import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
 
 function getCanonicalYouTubeUrl(videoId) {
   return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
+async function getAccessTokenFromRequest(request) {
+  const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+  if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+    return authHeader.slice('bearer '.length).trim();
+  }
+
+  // Fallback: try Supabase auth cookie (project-specific name), e.g. "sb-<ref>-auth-token"
+  try {
+    const cookieStore = await cookies();
+    const all = cookieStore.getAll();
+    const authCookie = all.find((c) => c.name.endsWith('-auth-token'));
+    if (!authCookie?.value) return null;
+
+    const parsed = JSON.parse(authCookie.value);
+    return parsed?.access_token || null;
+  } catch {
+    return null;
+  }
 }
 
 function getSupabaseCacheClient() {
@@ -44,10 +65,56 @@ function getSupabaseCacheClient() {
   return null;
 }
 
+async function getAuthenticatedUser(request) {
+  const accessToken = await getAccessTokenFromRequest(request);
+  if (!accessToken) return { user: null, accessToken: null, error: 'Missing auth token' };
+
+  const supabase = getSupabaseCacheClient();
+  if (!supabase) return { user: null, accessToken: null, error: 'Supabase not configured' };
+
+  const { data, error } = await supabase.auth.getUser(accessToken);
+  if (error || !data?.user) {
+    return { user: null, accessToken: null, error: error?.message || 'Invalid auth token' };
+  }
+
+  return { user: data.user, accessToken, error: null };
+}
+
+async function recordCreditUsage({
+  userId,
+  youtubeUrl,
+  videoId,
+  cacheHit,
+  provider,
+}) {
+  const supabase = getSupabaseCacheClient();
+  if (!supabase) return;
+
+  await supabase.from('credits_usage').insert([
+    {
+      user_id: userId,
+      action: 'transcript',
+      youtube_url: youtubeUrl,
+      video_id: videoId,
+      cache_hit: !!cacheHit,
+      provider: provider || null,
+    },
+  ]);
+}
+
 export async function POST(request) {
   console.log('[API /transcripts] POST request received');
   
   try {
+    // Credits require an authenticated user
+    const auth = await getAuthenticatedUser(request);
+    if (!auth.user) {
+      return Response.json(
+        { error: 'Unauthorized: please sign in to use credits' },
+        { status: 401 }
+      );
+    }
+
     const { url, language, chunkSize, mode } = await request.json();
     console.log('[API /transcripts] Request params:', { 
       url, 
@@ -102,6 +169,17 @@ export async function POST(request) {
           console.warn('[API /transcripts] Cache lookup error (continuing):', cacheError.message);
         } else if (cachedRows && cachedRows.length > 0 && cachedRows[0]?.transcript_content) {
           console.log('[API /transcripts] Cache hit from:', cachedRows[0].youtube_url);
+          try {
+            await recordCreditUsage({
+              userId: auth.user.id,
+              youtubeUrl: canonicalUrl,
+              videoId: validation.videoId,
+              cacheHit: true,
+              provider: 'supabase-cache',
+            });
+          } catch (e) {
+            console.warn('[API /transcripts] Failed to record credit usage (continuing):', e?.message || e);
+          }
           return Response.json({
             segments: cachedRows[0].transcript_content,
             language: language || 'en',
@@ -218,6 +296,19 @@ export async function POST(request) {
           console.warn('[API /transcripts] Cache write exception (continuing):', err?.message || err);
         }
       }
+    }
+
+    // Record 1 credit usage for this transcript request (best-effort)
+    try {
+      await recordCreditUsage({
+        userId: auth.user.id,
+        youtubeUrl: canonicalUrl,
+        videoId: validation.videoId,
+        cacheHit: false,
+        provider: result.provider || provider.name,
+      });
+    } catch (e) {
+      console.warn('[API /transcripts] Failed to record credit usage (continuing):', e?.message || e);
     }
 
     return Response.json(result);
