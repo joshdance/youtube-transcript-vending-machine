@@ -76,7 +76,7 @@ export async function POST(request) {
 
     const { data, error } = await supabase
       .from('transcripts')
-      .insert([insertData])
+      .upsert([insertData], { onConflict: 'youtube_url' })
       .select()
 
     if (error) {

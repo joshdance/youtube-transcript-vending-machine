@@ -285,7 +285,7 @@ export async function POST(request) {
 
           const { error: insertError } = await supabaseForWrite
             .from('transcripts')
-            .insert([insertData]);
+            .upsert([insertData], { onConflict: 'youtube_url' });
 
           if (insertError) {
             console.warn('[API /transcripts] Failed to cache transcript (continuing):', insertError.message);
