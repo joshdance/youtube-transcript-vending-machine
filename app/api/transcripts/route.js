@@ -43,14 +43,14 @@ async function getAccessTokenFromRequest(request) {
 function getSupabaseCacheClient() {
   const supabaseUrl =
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secretKey = process.env.SUPABASE_SECRET;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl) return null;
 
-  // Prefer service role for server-side caching (bypasses RLS).
-  if (serviceRoleKey) {
-    return createClient(supabaseUrl, serviceRoleKey, {
+  // Prefer secret key for server-side caching (bypasses RLS).
+  if (secretKey) {
+    return createClient(supabaseUrl, secretKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
   }

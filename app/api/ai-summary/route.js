@@ -1,74 +1,39 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateText } from "ai";
 import { generateAiSummaryPrompt } from "../../utils/aiSummaryPrompt";
 import DEFAULT_PROMPT from "../../utils/aiSummaryPrompt";
 
 // Toggle for development logging
 const DEV_MODE = false;
 
-function getSummaryBackend() {
-  // Prefer AI Gateway when configured, otherwise fall back to Gemini.
-  return (
-    process.env.AI_SUMMARY_BACKEND ||
-    (process.env.AI_GATEWAY_API_KEY ? "gateway" : "gemini")
-  );
-}
-
-async function generateSummaryViaGateway(prompt) {
+async function generateSummaryViaVercelAiSdk(prompt) {
   const apiKey = process.env.AI_GATEWAY_API_KEY;
   if (!apiKey) {
     throw new Error("Missing AI_GATEWAY_API_KEY in server configuration");
   }
 
-  // OpenAI-compatible endpoint
-  const baseUrl = process.env.AI_GATEWAY_BASE_URL || "https://gateway.ai.vercel.com/v1";
-  const model = process.env.AI_SUMMARY_MODEL || "openai:gpt-4o-mini";
+  const model = process.env.AI_SUMMARY_MODEL || "openai/gpt-5-nano";
 
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
+  try {
+    const { text } = await generateText({
       model,
-      messages: [{ role: "user", content: prompt }],
+      prompt,
       temperature: 0.2,
-    }),
-  });
+    });
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(
-      `AI Gateway error (${response.status}): ${text || response.statusText}`
-    );
+    if (!text) {
+      throw new Error("Vercel AI SDK returned an empty response");
+    }
+
+    return text;
+  } catch (error) {
+    const networkCode = error?.cause?.code || error?.code;
+    if (networkCode === "ECONNRESET" || networkCode === "ENOTFOUND") {
+      throw new Error(
+        "Cannot reach Vercel AI Gateway. Check network/proxy/VPN or try again."
+      );
+    }
+    throw error;
   }
-
-  const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error("AI Gateway returned an empty response");
-  }
-
-  return content;
-}
-
-async function generateSummaryViaGemini(prompt) {
-  const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("Missing GOOGLE_GEMINI_API_KEY in server configuration");
-  }
-
-  // Initialize the Google Generative AI client
-  const genAI = new GoogleGenerativeAI(apiKey);
-
-  // Use the Gemini flash model
-  const model = genAI.getGenerativeModel({
-    model: process.env.GOOGLE_GEMINI_MODEL || "gemini-2.0-flash",
-  });
-
-  const result = await model.generateContent(prompt);
-  return result.response.text();
 }
 
 export async function POST(request) {
@@ -122,14 +87,10 @@ Here is the transcript:
       console.log("Using prompt:", prompt.substring(0, 100) + "...");
     }
 
-    const backend = getSummaryBackend();
-    const provider = backend === "gateway" ? "vercel-ai-gateway" : "google-gemini";
+    const provider = "vercel-ai-sdk";
 
-    // Generate the summary
-    const summary =
-      backend === "gateway"
-        ? await generateSummaryViaGateway(prompt)
-        : await generateSummaryViaGemini(prompt);
+    // Generate the summary via Vercel AI SDK (AI Gateway)
+    const summary = await generateSummaryViaVercelAiSdk(prompt);
     
     // Log in dev mode
     if (DEV_MODE) {

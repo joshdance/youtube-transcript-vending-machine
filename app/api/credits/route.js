@@ -4,11 +4,11 @@ import { cookies } from 'next/headers';
 function getSupabaseServerClient() {
   const supabaseUrl =
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secretKey = process.env.SUPABASE_SECRET;
 
-  if (!supabaseUrl || !serviceRoleKey) return null;
+  if (!supabaseUrl || !secretKey) return null;
 
-  return createClient(supabaseUrl, serviceRoleKey, {
+  return createClient(supabaseUrl, secretKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
