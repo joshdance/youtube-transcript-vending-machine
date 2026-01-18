@@ -98,6 +98,23 @@ async function ensureUserRecord(supabase, user) {
   return created;
 }
 
+async function applyCreditsDelta(supabase, userId, delta) {
+  const { data, error } = await supabase.rpc('increment_user_credits', {
+    p_user_id: userId,
+    p_delta: delta,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    creditsBalance: row?.credits_balance ?? 0,
+    creditsAdded: row?.credits_added ?? 0,
+  };
+}
+
 async function getCreditsUsedCount(supabase, userId) {
   const { count, error } = await supabase
     .from('credits_usage')
@@ -113,28 +130,13 @@ async function getCreditsUsedCount(supabase, userId) {
 }
 
 async function grantCredits(supabase, user, creditsToAdd) {
-  const userRecord = await ensureUserRecord(supabase, user);
   const profile = getUserProfile(user);
-  const newBalance = (userRecord?.credits_balance ?? 0) + creditsToAdd;
-  const newAdded = (userRecord?.credits_added ?? 0) + creditsToAdd;
-
-  const { data: updated, error: updateError } = await supabase
-    .from('users')
-    .update({
-      ...profile,
-      credits_balance: newBalance,
-      credits_added: newAdded,
-    })
-    .eq('id', user.id)
-    .select('credits_balance, credits_added')
-    .single();
-
-  if (updateError) {
-    throw updateError;
-  }
+  await ensureUserRecord(supabase, user);
+  await supabase.from('users').update(profile).eq('id', user.id);
 
   const creditsUsed = await getCreditsUsedCount(supabase, user.id);
-  const balance = updated?.credits_balance ?? newBalance;
+  const updated = await applyCreditsDelta(supabase, user.id, creditsToAdd);
+  const balance = updated?.creditsBalance ?? 0;
 
   return {
     creditsAdded: creditsToAdd,
@@ -156,6 +158,13 @@ function getCheckoutUrl(request) {
       process.env.STRIPE_SUCCESS_URL || `${origin}/?payment=success`,
     cancelUrl: process.env.STRIPE_CANCEL_URL || `${origin}/?payment=cancel`,
   };
+}
+
+function sanitizeIdempotencyKey(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, 200);
 }
 
 export async function POST(request) {
@@ -226,6 +235,7 @@ export async function POST(request) {
 
     const stripe = new Stripe(stripeKey);
     const { successUrl, cancelUrl } = getCheckoutUrl(request);
+    const idempotencyKey = sanitizeIdempotencyKey(body?.idempotencyKey);
 
     const userRecord = await ensureUserRecord(supabase, user);
     let stripeCustomerId = userRecord?.stripe_customer_id;
@@ -244,24 +254,27 @@ export async function POST(request) {
         .eq('id', user.id);
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      customer: stripeCustomerId,
-      line_items: [
-        {
-          price: pack.priceId,
-          quantity: 1,
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: 'payment',
+        customer: stripeCustomerId,
+        line_items: [
+          {
+            price: pack.priceId,
+            quantity: 1,
+          },
+        ],
+        allow_promotion_codes: true,
+        client_reference_id: user.id,
+        metadata: {
+          user_id: user.id,
+          credits: String(creditsRequested),
         },
-      ],
-      allow_promotion_codes: true,
-      client_reference_id: user.id,
-      metadata: {
-        user_id: user.id,
-        credits: String(creditsRequested),
+        success_url: successUrl,
+        cancel_url: cancelUrl,
       },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-    });
+      idempotencyKey ? { idempotencyKey } : undefined
+    );
 
     return Response.json({
       success: true,

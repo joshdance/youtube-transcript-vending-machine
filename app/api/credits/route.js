@@ -103,6 +103,23 @@ async function getCreditsUsedCount(supabase, userId) {
   return count || 0;
 }
 
+async function applyCreditsDelta(supabase, userId, delta) {
+  const { data, error } = await supabase.rpc('increment_user_credits', {
+    p_user_id: userId,
+    p_delta: delta,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    creditsBalance: row?.credits_balance ?? 0,
+    creditsAdded: row?.credits_added ?? 0,
+  };
+}
+
 export async function GET(request) {
   try {
     const supabase = getSupabaseServerClient();
@@ -174,28 +191,13 @@ export async function POST(request) {
       );
     }
 
-    const userRecord = await ensureUserRecord(supabase, user);
+    await ensureUserRecord(supabase, user);
     const profile = getUserProfile(user);
-    const newBalance = (userRecord?.credits_balance ?? 0) + creditsToAdd;
-    const newAdded = (userRecord?.credits_added ?? 0) + creditsToAdd;
+    await supabase.from('users').update(profile).eq('id', user.id);
 
-    const { data: updated, error: updateError } = await supabase
-      .from('users')
-      .update({
-        ...profile,
-        credits_balance: newBalance,
-        credits_added: newAdded,
-      })
-      .eq('id', user.id)
-      .select('credits_balance, credits_added')
-      .single();
-
-    if (updateError) {
-      return Response.json({ error: updateError.message }, { status: 500 });
-    }
-
+    const updated = await applyCreditsDelta(supabase, user.id, creditsToAdd);
     const creditsUsed = await getCreditsUsedCount(supabase, user.id);
-    const balance = updated?.credits_balance ?? newBalance;
+    const balance = updated?.creditsBalance ?? 0;
 
     return Response.json({
       success: true,

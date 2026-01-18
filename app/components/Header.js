@@ -14,11 +14,19 @@ const Header = ({ session }) => {
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [paymentSuccess, setPaymentSuccess] = useState('');
+  const [checkoutAttemptId, setCheckoutAttemptId] = useState('');
   const creditOptions = useMemo(() => [10, 25, 50], []);
   const creditsRemaining =
     typeof creditsBalance === 'number' && typeof creditsUsed === 'number'
       ? Math.max(creditsBalance - creditsUsed, 0)
       : null;
+
+  const createCheckoutAttemptId = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    return `attempt-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +63,7 @@ const Header = ({ session }) => {
     setPaymentError('');
     setPaymentSuccess('');
     setIsPaymentOpen(true);
+    setCheckoutAttemptId(createCheckoutAttemptId());
   };
 
   const closePaymentModal = () => {
@@ -62,6 +71,7 @@ const Header = ({ session }) => {
     setIsPaymentOpen(false);
     setPaymentError('');
     setPaymentSuccess('');
+    setCheckoutAttemptId('');
   };
 
   const handleAddCredits = async () => {
@@ -75,13 +85,18 @@ const Header = ({ session }) => {
     setPaymentSuccess('');
 
     try {
+      const idempotencyKey = checkoutAttemptId || createCheckoutAttemptId();
+      if (!checkoutAttemptId) {
+        setCheckoutAttemptId(idempotencyKey);
+      }
+
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ credits: selectedPack }),
+        body: JSON.stringify({ credits: selectedPack, idempotencyKey }),
       });
 
       let data = {};
