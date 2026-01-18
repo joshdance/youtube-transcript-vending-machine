@@ -75,7 +75,7 @@ const Header = ({ session }) => {
     setPaymentSuccess('');
 
     try {
-      const res = await fetch('/api/credits', {
+      const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -92,15 +92,27 @@ const Header = ({ session }) => {
       }
 
       if (!res.ok) {
-        setPaymentError(data.error || 'Unable to add credits right now.');
+        setPaymentError(data.error || 'Unable to start checkout.');
         return;
       }
 
-      setCreditsUsed(data.creditsUsed ?? creditsUsed ?? 0);
-      setCreditsBalance(data.creditsBalance ?? creditsBalance ?? 0);
-      setPaymentSuccess(`Added ${data.creditsAdded ?? selectedPack} credits.`);
+      if (data?.bypassed) {
+        setCreditsUsed(data.creditsUsed ?? creditsUsed ?? 0);
+        setCreditsBalance(data.creditsBalance ?? creditsBalance ?? 0);
+        setPaymentSuccess(
+          `Added ${data.creditsAdded ?? 5} credits (bypass mode).`
+        );
+        return;
+      }
+
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+
+      setPaymentError('Unable to start checkout.');
     } catch {
-      setPaymentError('Unable to add credits right now.');
+      setPaymentError('Unable to start checkout.');
     } finally {
       setIsSubmittingPayment(false);
     }
@@ -235,7 +247,7 @@ const Header = ({ session }) => {
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={isSubmittingPayment}
               >
-                {isSubmittingPayment ? 'Processing...' : `Pay $${selectedPack}`}
+                {isSubmittingPayment ? 'Processing...' : 'Continue to checkout'}
               </button>
             </div>
           </div>
