@@ -184,7 +184,7 @@ const Header = ({ session }) => {
                   Add credits
                 </h2>
                 <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  This is a fake payment modal. No real charge is made.
+                  You will be redirected to Stripe Checkout to complete payment.
                 </p>
               </div>
               <button
