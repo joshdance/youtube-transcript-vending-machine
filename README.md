@@ -81,6 +81,11 @@ create index if not exists credits_usage_user_id_created_at_idx
 - `POST /api/transcripts`: requires auth; records 1 credit on success
 - `GET /api/credits`: returns `{ creditsUsed }` for the signed-in user
 
+## Stripe Payments
+
+See `STRIPE_SETUP.md` for complete Stripe product, price, webhook, and
+environment variable setup instructions.
+
 Then, install the dependencies and run the development server:
 
 ```bash
