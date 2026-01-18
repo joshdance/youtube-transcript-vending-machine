@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 
 const Hero = () => {
   return (
@@ -11,6 +12,15 @@ const Hero = () => {
       <p className="text-gray-600 dark:text-gray-400">
         Enter a YouTube URL to get the video&apos;s transcript
       </p>
+      <div className="relative w-full max-w-sm mx-auto mt-6 aspect-[2/3]">
+        <Image
+          src="/images/vendingmachine1.jpeg"
+          alt="YouTube transcript vending machine"
+          fill
+          className="object-cover rounded-xl shadow-lg"
+          priority
+        />
+      </div>
     </header>
   );
 };
