@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import ErrorMessage from "./components/ErrorMessage";
 import TranscriptDisplay from "./components/TranscriptDisplay";
 import VideoMetadata from "./components/VideoMetadata";
@@ -100,32 +101,50 @@ function MainContent({ session }) {
           <Header session={session} />
           <main className="w-full max-w-4xl flex flex-col gap-6 px-4">
             <Hero />
-            <div className="flex flex-col sm:flex-row gap-4">
-              <input
-                type="text"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://www.youtube.com/watch?v=... or https://www.youtube.com/playlist?list=..."
-                className="flex-grow p-3 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
-                disabled={isLoading}
-              />
-              {isPlaylist && playlistVideos ? (
-                <button
-                  onClick={() => handleFetchTranscript(url)}
-                  disabled={isLoading}
-                  className="py-3 px-6 rounded-md bg-foreground text-background hover:bg-[#383838] dark:hover:bg-[#ccc] transition-colors font-medium disabled:opacity-50"
-                >
-                  {isLoading ? "Loading..." : `Get Transcripts (${playlistVideos.length} videos)`}
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleFetchTranscript(url)}
-                  disabled={isLoading || !videoMetadata}
-                  className="py-3 px-6 rounded-md bg-foreground text-background hover:bg-[#383838] dark:hover:bg-[#ccc] transition-colors font-medium disabled:opacity-50"
-                >
-                  {isLoading ? "Loading..." : "Get Transcript"}
-                </button>
-              )}
+            
+            {/* Input field and image container - responsive layout */}
+            <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
+              {/* Input field section - appears first on mobile, left on desktop */}
+              <div className="w-full md:flex-1 flex flex-col gap-4 order-1 md:order-1">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <input
+                    type="text"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=... or https://www.youtube.com/playlist?list=..."
+                    className="flex-grow p-3 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                    disabled={isLoading}
+                  />
+                  {isPlaylist && playlistVideos ? (
+                    <button
+                      onClick={() => handleFetchTranscript(url)}
+                      disabled={isLoading}
+                      className="py-3 px-6 rounded-md bg-foreground text-background hover:bg-[#383838] dark:hover:bg-[#ccc] transition-colors font-medium disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {isLoading ? "Loading..." : `Get Transcripts (${playlistVideos.length} videos)`}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleFetchTranscript(url)}
+                      disabled={isLoading || !videoMetadata}
+                      className="py-3 px-6 rounded-md bg-foreground text-background hover:bg-[#383838] dark:hover:bg-[#ccc] transition-colors font-medium disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {isLoading ? "Loading..." : "Get Transcript"}
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {/* Vending machine image - appears second on mobile, right on desktop */}
+              <div className="relative w-full md:w-auto md:flex-shrink-0 md:max-w-sm aspect-[2/3] max-w-xs md:max-w-sm order-2 md:order-2">
+                <Image
+                  src="/images/vendingmachine1.jpeg"
+                  alt="YouTube transcript vending machine"
+                  fill
+                  className="object-cover rounded-xl shadow-lg"
+                  priority
+                />
+              </div>
             </div>
 
             {isFetchingMetadata && (

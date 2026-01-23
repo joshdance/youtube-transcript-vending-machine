@@ -25,9 +25,11 @@ SUPABASE_SECRET=sb_secret_...
 
 ## Step 2: Run Database Migrations
 
-The application uses two database tables:
+The application uses several database tables:
 - `transcripts` - Caches YouTube transcripts to avoid re-fetching
 - `credits_usage` - Tracks per-user credit usage (1 credit per transcript)
+- `users` - Stores user profiles and credit balances
+- `credit_purchases` - Tracks Stripe payment transactions
 
 ### Option A: Using Supabase CLI (Recommended)
 
@@ -41,23 +43,42 @@ The application uses two database tables:
    supabase link --project-ref lrgtmzgdjzdrtyynttqk
    ```
 
-3. Run migrations:
+3. Run all migrations:
    ```bash
    supabase db push
    ```
 
+This will run all migrations in the `supabase/migrations/` folder in chronological order.
+
 ### Option B: Manual SQL Execution
 
-If you prefer to run the SQL manually:
+If you prefer to run the SQL manually, you need to run **all 6 migrations** in order:
 
 1. Go to your Supabase project dashboard
 2. Click on **SQL Editor** in the left sidebar
-3. Click **New query**
-4. Copy and paste the contents of `supabase/migrations/20260115000001_create_transcripts_table.sql`
-5. Click **Run**
-6. Create another new query
-7. Copy and paste the contents of `supabase/migrations/20260115000002_create_credits_usage_table.sql`
-8. Click **Run**
+3. For each migration file below, create a new query, copy/paste the contents, and click **Run**:
+
+   **Migration 1:** `supabase/migrations/20260115000001_create_transcripts_table.sql`
+   - Creates the `transcripts` table for caching
+
+   **Migration 2:** `supabase/migrations/20260115000002_create_credits_usage_table.sql`
+   - Creates the `credits_usage` table for tracking credit consumption
+
+   **Migration 3:** `supabase/migrations/20260118000001_create_users_table.sql`
+   - Creates the `users` table linked to Supabase auth (stores credit balances)
+
+   **Migration 4:** `supabase/migrations/20260118000002_add_stripe_payments.sql`
+   - Adds Stripe customer ID to users table
+   - Creates the `credit_purchases` table for payment tracking
+
+   **Migration 5:** `supabase/migrations/20260118000003_add_credit_atomic_updates.sql`
+   - Adds atomic credit update function
+   - Adds refund/dispute tracking fields
+
+   **Migration 6:** `supabase/migrations/20260123000001_add_credits_usage_foreign_key.sql`
+   - Adds foreign key constraint to `credits_usage.user_id` for referential integrity
+
+**Important:** Run these migrations in order! Each migration depends on the previous ones.
 
 ## Step 3: Configure Email Authentication
 
@@ -161,9 +182,10 @@ TRANSCRIPT_PROVIDER=supadata
 
 ### Database errors
 
-- Make sure both migrations have been run successfully
-- Check that RLS policies are enabled on both tables
+- Make sure **all 6 migrations** have been run successfully (especially the `users` table migration)
+- Check that RLS policies are enabled on all tables
 - Verify the `SUPABASE_SECRET` key has been set correctly
+- If you see errors about missing tables, check the Table Editor in Supabase dashboard to see which tables exist
 
 ## Production Deployment
 
@@ -184,8 +206,21 @@ When deploying to production:
 ### `credits_usage` table
 - Tracks individual credit usage (1 row = 1 credit used)
 - Indexed on `user_id` and `created_at` for fast queries
+- Foreign key to `auth.users(id)` for referential integrity
 - Users can only read their own usage via RLS
 - Records whether the transcript was a cache hit or fresh fetch
+
+### `users` table
+- Stores user profiles and credit balances
+- Primary key `id` references `auth.users(id)` (foreign key)
+- Columns: `credits_balance`, `credits_added`, `stripe_customer_id`, `email`, `full_name`
+- Row Level Security enabled - users can only read their own record
+
+### `credit_purchases` table
+- Tracks Stripe payment transactions
+- Foreign key to `auth.users(id)`
+- Stores Stripe session IDs, payment intents, and purchase details
+- Used for payment reconciliation and refund tracking
 
 ## Support
 
