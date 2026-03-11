@@ -2,10 +2,27 @@ import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+function getSafeRedirectPath(requestUrl) {
+  const nextPath = requestUrl.searchParams.get('next')
+  if (!nextPath) return '/'
+
+  try {
+    const decoded = decodeURIComponent(nextPath)
+    if (decoded.startsWith('/') && !decoded.startsWith('//')) {
+      return decoded
+    }
+  } catch {
+    // Ignore invalid URI characters and fall back to "/"
+  }
+
+  return '/'
+}
+
 export async function GET(request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   const origin = requestUrl.origin
+  const redirectPath = getSafeRedirectPath(requestUrl)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
@@ -60,7 +77,7 @@ export async function GET(request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
-      return NextResponse.redirect(`${origin}/`)
+      return NextResponse.redirect(`${origin}${redirectPath}`)
     }
 
     console.error('[auth-callback] exchangeCodeForSession error:', {
@@ -71,6 +88,5 @@ export async function GET(request) {
     })
   }
 
-  // Return the user to an error page with instructions
-  return NextResponse.redirect(`${origin}/`)
+  return NextResponse.redirect(`${origin}/signin?error=auth_callback_failed`)
 }
