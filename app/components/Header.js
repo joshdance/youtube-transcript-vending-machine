@@ -149,6 +149,33 @@ const Header = ({ session }) => {
             >
               Home
             </Link>
+            {session && (
+              <Link
+                href="/transcripts"
+                className={`px-3 py-1 rounded-md transition-colors ${
+                  pathname === '/transcript' ||
+                  pathname.startsWith('/transcript/') ||
+                  pathname === '/transcripts' ||
+                  pathname.startsWith('/transcripts/')
+                    ? 'bg-gray-200 dark:bg-gray-700 font-medium'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+              >
+                Transcripts
+              </Link>
+            )}
+            {session && (
+              <Link
+                href="/profile"
+                className={`px-3 py-1 rounded-md transition-colors ${
+                  pathname === '/profile'
+                    ? 'bg-gray-200 dark:bg-gray-700 font-medium'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+              >
+                Profile
+              </Link>
+            )}
           </nav>
         </div>
         <div className="flex items-center gap-3">
